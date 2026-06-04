@@ -3,55 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shashqol Multi Arena</title>
+    <title>OSHQ OʻYIN</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        body { font-family: sans-serif; background: #0f172a; color: white; text-align: center; padding: 15px; margin: 0; }
-        .box { background: #1e293b; padding: 25px; border-radius: 16px; max-width: 400px; margin: 40px auto; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+        body { font-family: sans-serif; background: #0b1329; color: white; text-align: center; padding: 15px; margin: 0; }
+        .box { background: #1c2541; padding: 25px; border-radius: 16px; max-width: 420px; margin: 40px auto; box-shadow: 0 4px 25px rgba(0,0,0,0.5); border: 1px solid #3a506b; }
         input, select, button { width: 100%; padding: 14px; margin: 10px 0; border-radius: 8px; border: none; box-sizing: border-box; font-size: 1rem; }
-        input, select { background: #334155; color: white; }
-        button { background: #22c55e; color: white; font-weight: bold; cursor: pointer; }
-        button:disabled { background: #64748b; cursor: not-allowed; }
+        input, select { background: #3a506b; color: white; font-weight: bold; }
+        button { background: #4cc9f0; color: #0b1329; font-weight: bold; cursor: pointer; font-size: 1.1rem; }
+        button:disabled { background: #5c677d; cursor: not-allowed; color: #ffffff; }
         .hidden { display: none; }
-        .status-text { color: #38bdf8; font-weight: bold; font-size: 1.1rem; margin: 15px 0; }
-        .company { color: #a855f7; font-weight: bold; }
-        .online-badge { color: #f59e0b; font-weight: bold; font-size: 1.1rem; margin-bottom: 15px; }
+        .status-text { color: #4cc9f0; font-weight: bold; font-size: 1.1rem; margin: 15px 0; white-space: pre-line; }
+        .online-badge { color: #f77f00; font-weight: bold; font-size: 1.1rem; margin-bottom: 10px; }
+        .tax-badge { background: #d62828; color: white; padding: 5px 12px; border-radius: 20px; display: inline-block; font-size: 0.85rem; font-weight: bold; margin-bottom: 15px; }
     </style>
 </head>
 <body>
 
+<!-- 1. Kirish ekrani -->
 <div class="box" id="login-screen">
-    <h2>Shashqol Arena</h2>
-    <p>Oʻyindagi ismingizni yozing:</p>
+    <h2>🎯 OSHQ OʻYIN</h2>
+    <p>Oʻyinga kirish uchun ismingizni yozing:</p>
     <input type="text" id="player-name" placeholder="Ismingiz...">
     <button onclick="login()">Oʻyinga kirish</button>
 </div>
 
+<!-- 2. Asosiy o'yin ekrani -->
 <div class="box hidden" id="game-screen">
     <div class="online-badge">Onlayn oʻyinchilar: <span id="online-users">0</span> ta</div>
+    <div class="tax-badge">Kompaniya xizmati: 3%</div>
     
-    <h2 id="hello-text">Salom</h2>
+    <h2>OSHQ OʻYIN</h2>
+    <h3 id="hello-text">Salom</h3>
     <p>Sizning balansingiz: <span id="user-bal" style="color:#4ade80; font-weight:bold;">0</span> soʻm</p>
-    <p class="company">Kompaniya foydasi (3% soliq): <span id="comp-profit">0</span> soʻm</p>
-    <hr style="border-color: #334155;">
+    <hr style="border-color: #3a506b;">
     
     <div id="setup-area">
         <p>Tikish miqdorini tanlang:</p>
         <select id="bet-amount">
             <option value="10000">10 000 soʻm</option>
             <option value="50000" selected>50 000 soʻm</option>
-            <option value="100000">10 000 soʻm</option>
+            <option value="100000">100 000 soʻm</option>
             <option value="500000">500 000 soʻm</option>
         </select>
-        <button id="find-btn" onclick="findOpponent()">Raqib qidirish</button>
+        <button id="find-btn" style="background: #22c55e; color:white;" onclick="findOpponent()">Raqib qidirish</button>
     </div>
 
     <div id="play-area" class="hidden">
         <div class="status-text" id="status-msg">Raqib qidirilmoqda...</div>
-        <button id="roll-btn" style="background:#38bdf8;" onclick="roll()" disabled>Shashqol tashlash</button>
+        <button id="roll-btn" onclick="roll()" disabled>Oshiqlarni tashlash 🎲</button>
     </div>
 
-    <button id="buy-btn" style="background:#e11d48; display:none;" onclick="buyChips()">Pul sotib olish (500k)</button>
+    <button id="buy-btn" style="background:#e11d48; color:white; display:none;" onclick="buyChips()">Pul sotib olish (500k)</button>
 </div>
 
 <script>
@@ -66,12 +69,10 @@
     socket.on('register_success', (data) => {
         document.getElementById('login-screen').classList.add('hidden');
         document.getElementById('game-screen').classList.remove('hidden');
-        document.getElementById('hello-text').innerText = "Omad, " + data.name + "!";
+        document.getElementById('hello-text').innerText = data.name;
         document.getElementById('user-bal').innerText = data.balance.toLocaleString();
-        document.getElementById('comp-profit').innerText = data.companyProfit.toLocaleString();
     });
 
-    // Serverdan keladigan onlayn sonini qabul qilib ekranga chiqarish
     socket.on('online_count', (count) => {
         document.getElementById('online-users').innerText = count;
     });
@@ -89,23 +90,22 @@
 
     socket.on('game_start', (data) => {
         currentRoom = data.roomId;
-        document.getElementById('status-msg').innerText = `Raqib topildi: ${data.p1} VS ${data.p2}! Qani tashlang!`;
+        document.getElementById('status-msg').innerText = `Raqib topildi: ${data.p1} VS ${data.p2}!\nTikildi: ${data.bet.toLocaleString()} soʻm.\n\nOshiqlarni tashlang!`;
         document.getElementById('roll-btn').disabled = false;
     });
 
     function roll() {
         socket.emit('roll_dice', currentRoom);
         document.getElementById('roll-btn').disabled = true;
-        document.getElementById('status-msg').innerText = "Tosh tashladingiz. Raqib kutilmoqda...";
+        document.getElementById('status-msg').innerText = "Oshiqlarni tashladingiz. Raqib kutilmoqda...";
     }
 
     socket.on('player_rolled', (data) => {
-        document.getElementById('status-msg').innerText = `${data.name} tosh tashladi!`;
+        document.getElementById('status-msg').innerText = `${data.name} oshiqlarni tashladi!`;
     });
 
     socket.on('game_over', (data) => {
         alert(data.result);
-        document.getElementById('comp-profit').innerText = data.companyProfit.toLocaleString();
         
         let myNewBalance = socket.id === data.p1Id ? data.p1Balance : data.p2Balance;
         document.getElementById('user-bal').innerText = myNewBalance.toLocaleString();
