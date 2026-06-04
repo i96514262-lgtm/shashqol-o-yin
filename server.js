@@ -12,8 +12,8 @@ let activePlayers = {};
 let waitingLobby = []; 
 let activeRooms = {};
 
-// Oshiqning 4 ta tomoni
-const OSHIQ_SIDES = ["Chika", "Puka", "Chū", "Oʻng"];
+// Oshiqning haqiqiy 4 ta tomoni
+const OSHIQ_SIDES = ["Oʻng", "Chap", "Tik oʻng", "Tik chap"];
 
 function broadcastOnlineCount() {
     io.emit('online_count', Object.keys(activePlayers).length);
@@ -95,7 +95,6 @@ io.on('connection', (socket) => {
         const pIndex = room.players.findIndex(p => p.id === socket.id);
         if (pIndex === -1 || room.players[pIndex].result !== null) return;
 
-        // 4 ta oshiq tashlash
         let rolledSides = [];
         for (let i = 0; i < 4; i++) {
             let rand = Math.floor(Math.random() * 4);
@@ -131,49 +130,40 @@ io.on('connection', (socket) => {
     });
 });
 
-// Oshiq kombinatsiyasini aniqlash funksiyasi
 function evaluateOshiq(sides) {
-    let counts = { "Chika": 0, "Puka": 0, "Chū": 0, "Oʻng": 0 };
+    let counts = { "Oʻng": 0, "Chap": 0, "Tik oʻng": 0, "Tik chap": 0 };
     sides.forEach(s => counts[s] = (counts[s] || 0) + 1);
     
     let uniqueCount = Object.keys(counts).filter(k => counts[k] > 0).length;
     let maxSame = Math.max(...Object.values(counts));
 
-    // 1. 4 ta Chika bo'lsa
-    if (counts["Chika"] === 4) {
-        return { score: 100, statusName: "CHIKA! (4 ta Chika)", isChu: false };
-    }
-    // 2. 4 ta Puka bo'lsa
-    if (counts["Puka"] === 4) {
-        return { score: 95, statusName: "PUKA! (4 ta Puka)", isChu: false };
-    }
-    // 3. 4 xil tushsa (Siyo)
+    // Tikka turganlar soni
+    let tikkaSoni = counts["Tik oʻng"] + counts["Tik chap"];
+
+    // 1. SIYO - 4 xil tomon tushsa (Oliy yutuq)
     if (uniqueCount === 4) {
-        return { score: 90, statusName: "SIYO! (4 xil tushdi)", isChu: false };
+        return { score: 100, statusName: "SIYO", isChu: false };
     }
-    // 4. 4 ta bir xil tursa (qolgan tomonlar)
-    if (maxSame === 4) {
-        return { score: 85, statusName: "4 URUGʻ!", isChu: false };
+
+    // 2. 4 URUGʻ - 4 tasi ham tik turgan bo'lsa
+    if (tikkaSoni === 4) {
+        return { score: 90, statusName: "4 URUGʻ", isChu: false };
     }
-    // 5. CHŪ holati: 1 ta alohida va 3 ta bir xil bo'lsa (yoki Chū aralashsa)
-    if (maxSame === 3 || counts["Chū"] > 1) {
-        return { score: 0, statusName: "CHŪ! (Omadsiz tushish)", isChu: true };
+
+    // 3. 3 URUGʻ - 3 tasi tik turgan bo'lsa
+    if (tikkaSoni === 3) {
+        return { score: 80, statusName: "3 URUGʻ", isChu: false };
     }
-    // 6. 3 ta bir xil tursa (Chu bo'lmagan holatda)
+
+    // 4. CHŪ - 1 ta alohida va qolgan 3 tasi bir xil bo'lib yotsa (Omadsiz holat)
     if (maxSame === 3) {
-        return { score: 70, statusName: "3 URUGʻ!", isChu: false };
+        return { score: 0, statusName: "CHŪ", isChu: true };
     }
 
-    // Oddiy holat uchun ochko (Chika=4, Puka=3, O'ng=2, Chu=0)
-    let normalScore = 0;
-    sides.forEach(s => {
-        if (s === "Chika") normalScore += 4;
-        if (s === "Puka") normalScore += 3;
-        if (s === "Oʻng") normalScore += 2;
-        if (s === "Chū") normalScore += 0;
-    });
-
-    return { score: normalScore, statusName: `Oddiy tushish (${normalScore} ochko)`, isChu: false };
+    // 5. POZA - Oddiy yutuq holati (Ochkolar yig'indisi)
+    // Tikka tomonlarga ko'proq ochko beriladi
+    let normalScore = (counts["Tik oʻng"] * 4) + (counts["Tik chap"] * 3) + (counts["Oʻng"] * 2) + (counts["Chap"] * 1);
+    return { score: normalScore, statusName: "POZA", isChu: false };
 }
 
 function evaluateWinner(room) {
@@ -187,22 +177,28 @@ function evaluateWinner(room) {
 
     let p1Data = activePlayers[p1.id];
     let p2Data = activePlayers[p2.id];
-
-    let p1Txt = `${p1.name} oshiqlari: [${p1.result.sides.join(' | ')}]\n➔ Natija: ${p1.result.statusName}`;
-    let p2Txt = `${p2.name} oshiqlari: [${p2.result.sides.join(' | ')}]\n➔ Natija: ${p2.result.statusName}`;
     
     let winnerId = null;
-    let finalResultStr = "";
+    let finalStatusText = "";
 
     if (p1.result.isChu && p2.result.isChu) {
-        finalResultStr = `Ikkala tomon ham CHŪ boʻldi! Durang. Pullar qaytarildi.`;
+        finalStatusText = "CHŪ (Ikkala tomon ham omadsiz - Durang)";
     } else if (p1.result.isChu) {
-        winnerId = p2.id; 
+        winnerId = p2.id;
+        finalStatusText = `${p2.name}: ${p2.result.statusName}`;
     } else if (p2.result.isChu) {
-        winnerId = p1.id; 
+        winnerId = p1.id;
+        finalStatusText = `${p1.name}: ${p1.result.statusName}`;
     } else {
-        if (p1.result.score > p2.result.score) winnerId = p1.id;
-        else if (p2.result.score > p1.result.score) winnerId = p2.id;
+        if (p1.result.score > p2.result.score) {
+            winnerId = p1.id;
+            finalStatusText = `${p1.name}: ${p1.result.statusName}`;
+        } else if (p2.result.score > p1.result.score) {
+            winnerId = p2.id;
+            finalStatusText = `${p2.name}: ${p2.result.statusName}`;
+        } else {
+            finalStatusText = "DURANG";
+        }
     }
 
     if (winnerId) {
@@ -210,20 +206,14 @@ function evaluateWinner(room) {
         if (winnerId === p1.id) {
             if (p1Data) p1Data.balance += (netPrize - bet);
             if (p2Data) p2Data.balance -= bet;
-            finalResultStr = `🏆 ${p1.name} yutdi! (+${netPrize.toLocaleString()} soʻm)`;
         } else {
             if (p2Data) p2Data.balance += (netPrize - bet);
             if (p1Data) p1Data.balance -= bet;
-            finalResultStr = `🏆 ${p2.name} yutdi! (+${netPrize.toLocaleString()} soʻm)`;
         }
-    } else if (!p1.result.isChu && !p2.result.isChu) {
-        finalResultStr = `Durang boʻldi! Pullar qaytarildi.`;
     }
 
-    let fullReport = `${p1Txt}\n\n${p2Txt}\n\nNatija: ${finalResultStr}`;
-
     io.to(room.id).emit('game_over', {
-        result: fullReport,
+        result: finalStatusText,
         p1Id: p1.id,
         p1Balance: p1Data ? p1Data.balance : 0,
         p2Id: p2.id,
@@ -236,4 +226,4 @@ function evaluateWinner(room) {
 }
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log('OSHQ OʻYIN serveri tayyor...'));
+server.listen(PORT, () => console.log('OSHQ OʻYIN haqiqiy tomonlar bilan tayyor...'));
