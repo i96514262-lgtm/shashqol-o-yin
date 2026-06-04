@@ -12,7 +12,7 @@ let activePlayers = {};
 let waitingLobby = []; 
 let activeRooms = {};
 
-// Oshiqning haqiqiy 4 ta tomoni
+// Oshiqning haqiqiy 4 ta tomoni: 2 ta yotiq, 2 ta tik
 const OSHIQ_SIDES = ["Oʻng", "Chap", "Tik oʻng", "Tik chap"];
 
 function broadcastOnlineCount() {
@@ -137,7 +137,7 @@ function evaluateOshiq(sides) {
     let uniqueCount = Object.keys(counts).filter(k => counts[k] > 0).length;
     let maxSame = Math.max(...Object.values(counts));
 
-    // Tikka turganlar soni
+    // Tikka turgan oshiqlar soni (Tik o'ng va Tik chap)
     let tikkaSoni = counts["Tik oʻng"] + counts["Tik chap"];
 
     // 1. SIYO - 4 xil tomon tushsa (Oliy yutuq)
@@ -145,23 +145,22 @@ function evaluateOshiq(sides) {
         return { score: 100, statusName: "SIYO", isChu: false };
     }
 
-    // 2. 4 URUGʻ - 4 tasi ham tik turgan bo'lsa
+    // 2. 4 URUGʻ - 4 ta oshiq ham tik turgan bo'lsa
     if (tikkaSoni === 4) {
         return { score: 90, statusName: "4 URUGʻ", isChu: false };
     }
 
-    // 3. 3 URUGʻ - 3 tasi tik turgan bo'lsa
+    // 3. 3 URUGʻ - 3 ta oshiq tik turgan bo'lsa
     if (tikkaSoni === 3) {
         return { score: 80, statusName: "3 URUGʻ", isChu: false };
     }
 
-    // 4. CHŪ - 1 ta alohida va qolgan 3 tasi bir xil bo'lib yotsa (Omadsiz holat)
+    // 4. CHŪ - 1 ta alohida va 3 ta bir xil yotsa (Omadsiz holat)
     if (maxSame === 3) {
         return { score: 0, statusName: "CHŪ", isChu: true };
     }
 
-    // 5. POZA - Oddiy yutuq holati (Ochkolar yig'indisi)
-    // Tikka tomonlarga ko'proq ochko beriladi
+    // 5. POZA - Oddiy yutuq holati
     let normalScore = (counts["Tik oʻng"] * 4) + (counts["Tik chap"] * 3) + (counts["Oʻng"] * 2) + (counts["Chap"] * 1);
     return { score: normalScore, statusName: "POZA", isChu: false };
 }
@@ -181,8 +180,9 @@ function evaluateWinner(room) {
     let winnerId = null;
     let finalStatusText = "";
 
+    // O'yin tugaganda chiqadigan qisqa va aniq yozuvlar
     if (p1.result.isChu && p2.result.isChu) {
-        finalStatusText = "CHŪ (Ikkala tomon ham omadsiz - Durang)";
+        finalStatusText = "CHŪ (Ikkala tomon ham omadsiz)";
     } else if (p1.result.isChu) {
         winnerId = p2.id;
         finalStatusText = `${p2.name}: ${p2.result.statusName}`;
@@ -226,4 +226,4 @@ function evaluateWinner(room) {
 }
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log('OSHQ OʻYIN haqiqiy tomonlar bilan tayyor...'));
+server.listen(PORT, () => console.log('OSHQ OʻYIN yakuniy versiyasi ishlamoqda...'));
