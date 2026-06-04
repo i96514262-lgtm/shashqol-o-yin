@@ -8,12 +8,14 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
 let companyProfit = 0;
-
-// Onlayn o'yinchilar ro'yxati
 let activePlayers = {};
-// Kutish zalidagi (raqib qidirayotgan) o'yinchilar pool'i
 let waitingLobby = []; 
 let activeRooms = {};
+
+// Onlayn foydalanuvchilar sonini barchaga yuborish funksiyasi
+function broadcastOnlineCount() {
+    io.emit('online_count', Object.keys(activePlayers).length);
+}
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
@@ -21,18 +23,17 @@ app.get('/', (req, res) => {
 
 io.on('connection', (socket) => {
     
-    // 1. Ism bilan o'yinga kirish
+    // Ism bilan kirganda ro'yxatga olish
     socket.on('register_player', (playerName) => {
         if (!playerName || playerName.trim() === "") {
             return socket.emit('error_msg', 'Iltimos, ismingizni kiriting!');
         }
         
-        // Har bir yangi odamga 500,000 so'm boshlang'ich virtual pul beriladi
         activePlayers[socket.id] = {
             id: socket.id,
             name: playerName,
             balance: 500000,
-            status: "idle" // idle, searching, playing
+            status: "idle"
         };
 
         socket.emit('register_success', {
@@ -40,30 +41,29 @@ io.on('connection', (socket) => {
             balance: activePlayers[socket.id].balance,
             companyProfit: companyProfit
         });
+
+        // Kimdir ism yozib kirsa, hamma ekrandagi onlayn soni yangilanadi
+        broadcastOnlineCount();
     });
 
-    // 2. Avtomatik Raqib Qidirish (Matchmaking)
+    // Raqib qidirish
     socket.on('find_opponent', (betAmount) => {
         const player = activePlayers[socket.id];
         if (!player) return;
 
         const bet = parseInt(betAmount);
         if (bet < 10000 || bet > 10000000) {
-            return socket.emit('error_msg', 'Tikish miqdori 10,000 va 10,000,000 soʻm orasida boʻlishi shart!');
+            return socket.emit('error_msg', 'Tikish miqdori notoʻgʻri!');
         }
         if (player.balance < bet) {
             return socket.emit('error_msg', 'Mablagʻingiz yetarli emas!');
         }
 
         player.status = "searching";
-        
-        // Xuddi shu pulni tikib kutib turgan raqibni qidirish
         let opponent = waitingLobby.find(p => p.bet === bet && p.id !== socket.id && activePlayers[p.id]?.status === "searching");
 
         if (opponent) {
-            // Raqib topildi! O'yin xonasi ochamiz
-            waitingLobby = waitingLobby.filter(p => p.id !== opponent.id); // lobbidan olish
-            
+            waitingLobby = waitingLobby.filter(p => p.id !== opponent.id);
             const roomId = "room_" + Date.now();
             player.status = "playing";
             activePlayers[opponent.id].status = "playing";
@@ -77,7 +77,6 @@ io.on('connection', (socket) => {
                 ]
             };
 
-            // Ikkala o'yinchini xonaga ulaymiz
             const oppSocket = io.sockets.sockets.get(opponent.id);
             if (oppSocket) oppSocket.join(roomId);
             socket.join(roomId);
@@ -89,13 +88,12 @@ io.on('connection', (socket) => {
                 p2: opponent.name
             });
         } else {
-            // Raqib yo'q bo'lsa, kutish zaliga qo'shish
             waitingLobby.push({ id: socket.id, bet: bet, name: player.name });
             socket.emit('waiting_mode', 'Raqib qidirilmoqda, iltimos kuting...');
         }
     });
 
-    // 3. Shashqol tashlash
+    // Tosh tashlash
     socket.on('roll_dice', (roomId) => {
         const room = activeRooms[roomId];
         if (!room) return;
@@ -106,13 +104,12 @@ io.on('connection', (socket) => {
         room.players[pIndex].dice = Math.floor(Math.random() * 6) + 1;
         io.to(roomId).emit('player_rolled', { name: room.players[pIndex].name });
 
-        // Ikkala o'yinchi ham tashlagan bo'lsa
         if (room.players[0].dice !== null && room.players[1].dice !== null) {
             evaluateWinner(room);
         }
     });
 
-    // 4. Virtual pul sotib olish
+    // Pul olish
     socket.on('buy_chips', () => {
         if (activePlayers[socket.id]) {
             activePlayers[socket.id].balance += 500000;
@@ -120,10 +117,12 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Aloqa uzilganda xonadan chiqarish
+    // Saytdan chiqib ketganda
     socket.on('disconnect', () => {
         waitingLobby = waitingLobby.filter(p => p.id !== socket.id);
         delete activePlayers[socket.id];
+        // Onlayn sonini kamaytirish
+        broadcastOnlineCount();
     });
 });
 
@@ -133,7 +132,7 @@ function evaluateWinner(room) {
     const bet = room.bet;
     
     let totalPool = bet * 2;
-    let tax = Math.round(totalPool * 0.03); // 3% Kompaniya foydasi
+    let tax = Math.round(totalPool * 0.03);
     let netPrize = totalPool - tax;
     let result = "";
 
@@ -163,7 +162,6 @@ function evaluateWinner(room) {
         p2Balance: p2Data ? p2Data.balance : 0
     });
 
-    // O'yinchilar holatini tiklash
     if (p1Data) p1Data.status = "idle";
     if (p2Data) p2Data.status = "idle";
     delete activeRooms[room.id];
