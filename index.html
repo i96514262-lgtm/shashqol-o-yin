@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shashqol Online</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { font-family: sans-serif; background: #1e293b; color: white; text-align: center; padding: 20px; }
+        .box { background: #334155; padding: 20px; border-radius: 12px; max-width: 400px; margin: auto; }
+        input, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 6px; border: none; box-sizing: border-box;}
+        button { background: #22c55e; color: white; font-weight: bold; cursor: pointer; }
+        .hidden { display: none; }
+        .dice { font-size: 3rem; background: #475569; width: 60px; height: 60px; line-height: 60px; margin: 10px auto; border-radius: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="box" id="login-screen">
+    <h2>Shashqol Arena</h2>
+    <p>Kirish uchun ID yozing (user123 yoki user456)</p>
+    <input type="text" id="acc-id" placeholder="Akkaunt ID">
+    <button onclick="login()">Kirish</button>
+</div>
+
+<div class="box hidden" id="game-screen">
+    <h3 id="player-tag">Xush kelibsiz</h3>
+    <p>Sizning balansingiz: <span id="user-bal">0</span> soʻm</p>
+    <p style="color: #38bdf8;">Kompaniya foydasi (3%): <span id="comp-profit">0</span> soʻm</p>
+    <hr>
+    <input type="text" id="room-id" placeholder="Xona nomi (masalan: xona1)">
+    <input type="number" id="bet-amount" value="50000" placeholder="Tikish (min 10,000)">
+    <button onclick="joinRoom()">Xonaga kirish / Yaratish</button>
+    
+    <div id="play-area" class="hidden">
+        <h4 id="status">Raqib kutilmoqda...</h4>
+        <div class="dice" id="dice-view">-</div>
+        <button id="roll-btn" onclick="roll()" disabled>Shashqol tashlash</button>
+    </div>
+    
+    <button id="buy-btn" style="background:#e11d48; display:none;" onclick="buyChips()">Pul sotib olish (500,000 soʻm)</button>
+</div>
+
+<script>
+    const socket = io();
+    let myRoom = "";
+
+    function login() {
+        const id = document.getElementById('acc-id').value;
+        socket.emit('login', id);
+    }
+
+    socket.on('login_success', (data) => {
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('game-screen').classList.remove('hidden');
+        document.getElementById('player-tag').innerText = data.name;
+        document.getElementById('user-bal').innerText = data.balance.toLocaleString();
+        document.getElementById('comp-profit').innerText = data.companyProfit.toLocaleString();
+    });
+
+    socket.on('login_error', msg => alert(msg));
+
+    function joinRoom() {
+        myRoom = document.getElementById('room-id').value;
+        const bet = document.getElementById('bet-amount').value;
+        if(!myRoom) return alert("Xona nomini yozing");
+        socket.emit('join_room', { roomId: myRoom, betAmount: bet });
+        document.getElementById('play-area').classList.remove('hidden');
+    }
+
+    socket.on('game_ready', () => {
+        document.getElementById('status').innerText = "Oʻyin boshlandi! Tashlang!";
+        document.getElementById('roll-btn').disabled = false;
+    });
+
+    function roll() {
+        socket.emit('roll_dice', myRoom);
+        document.getElementById('roll-btn').disabled = true;
+        document.getElementById('status').innerText = "Tosh tashladingiz, raqib kutilmoqda...";
+    }
+
+    socket.on('player_rolled', data => {
+        document.getElementById('status').innerText = data.name + " shashqol tashladi!";
+    });
+
+    socket.on('game_over', data => {
+        alert(data.result);
+        document.getElementById('status').innerText = "Oʻyin tugadi.";
+        document.getElementById('comp-profit').innerText = data.companyProfit.toLocaleString();
+        
+        // Balansni yangilash (qaysi foydalanuvchi ligiga qarab)
+        const name = document.getElementById('player-tag').innerText;
+        let yangiBalans = name === "Oʻyinchi 1" ? data.p1Balance : data.p2Balance;
+        document.getElementById('user-bal').innerText = yangiBalans.toLocaleString();
+        
+        if (yangiBalans < 10000) {
+            document.getElementById('buy-btn').style.display = "block";
+        }
+    });
+
+    function buyChips() {
+        socket.emit('buy_chips', 500000);
+        document.getElementById('buy-btn').style.display = "none";
+    }
+
+    socket.on('balance_updated', bal => {
+        document.getElementById('user-bal').innerText = bal.toLocaleString();
+    });
+    
+    socket.on('error_msg', msg => alert(msg));
+</script>
+</body>
+</html>
