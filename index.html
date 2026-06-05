@@ -30,7 +30,6 @@
 </head>
 <body>
 
-<!-- 🗂 KIRISH EKRANI -->
 <div class="box" id="login-screen">
     <h2>🎯 OSHQ OʻYIN TIZIMI</h2>
     <p>Akkaunt ma'lumotlari:</p>
@@ -47,7 +46,6 @@
     </div>
 </div>
 
-<!-- 👑 KASSA PANEL -->
 <div class="box hidden admin-box" id="admin-screen">
     <h2>👑 ASOSIY KASSA PANEL</h2>
     <div style="background: #064e3b; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
@@ -74,7 +72,6 @@
     <button style="background: #ef4444; color: white; margin-top: 20px;" onclick="location.reload()">Chiqish</button>
 </div>
 
-<!-- 👤 O'YINCHI INTERFEYSI -->
 <div class="box hidden" id="game-screen">
     <div style="text-align: left;">
         <div class="id-badge" id="user-id-display">ID raqamingiz: ----</div>
@@ -106,20 +103,19 @@
 </div>
 
 <script>
-    const socket = io();
+    // 🔥 Render jonli ulanish manzili muhrlandi!
+    const socket = io("https://shashqol-o-yin.onrender.com");
     let currentRoom = "";
     let selectedPlayerIdForAction = null;
     let allPlayersData = []; 
     let visualTimerInterval = null;
 
-    // Sahifa yuklanganda telefonda eski saqlangan ID bormi, tekshiramiz
     window.onload = function() {
         const savedId = localStorage.getItem('oshq_player_id');
         const savedName = localStorage.getItem('oshq_player_name');
         if (savedId) {
             document.getElementById('player-id-input').value = savedId;
             if (savedName) document.getElementById('player-name').value = savedName;
-            // Avtomatik silliq kirish
             socket.emit('register_player', { id: savedId, name: savedName || "" });
         }
     }
@@ -131,7 +127,6 @@
     }
 
     socket.on('register_success', (data) => {
-        // ID va Ismni telefonga umrbod saqlab qo'yamiz
         localStorage.setItem('oshq_player_id', data.id);
         localStorage.setItem('oshq_player_name', data.name);
 
@@ -143,7 +138,7 @@
     });
 
     function clearMyAccount() {
-        if(confirm("Haqiqatdan ham bu qurilmadan akkauntingizni uzmoqchimisiz? (ID o'chmaydi, faqat telefondan o'chadi)")) {
+        if(confirm("Haqiqatdan ham bu qurilmadan akkauntingizni uzmoqchimisiz?")) {
             localStorage.removeItem('oshq_player_id');
             localStorage.removeItem('oshq_player_name');
             location.reload();
