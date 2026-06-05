@@ -2,25 +2,44 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const fs = require('fs'); // Fayllar bilan ishlash uchun modul
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
-// Bir umrlik akkauntlar bazasi va admin ma'lumotlari
-let dbPlayers = {}; 
-let nextPlayerId = 1001; 
-let companyProfit = 0;
+const DB_FILE = path.join(__dirname, 'database.json');
+
+// Baza faylini yuklash yoki yangi yaratish
+let dbData = {
+    players: {},
+    nextPlayerId: 1001,
+    companyProfit: 0
+};
+
+if (fs.existsSync(DB_FILE)) {
+    try {
+        const fileContent = fs.readFileSync(DB_FILE, 'utf8');
+        dbData = JSON.parse(fileContent);
+    } catch (e) {
+        console.log("Baza faylini o'qishda xato, yangi ochiladi.");
+    }
+}
+
+// Ma'lumotlarni faylga saqlash funksiyasi
+function saveToDatabase() {
+    fs.writeFileSync(DB_FILE, JSON.stringify(dbData, null, 2), 'utf8');
+}
 
 let onlineSockets = {}; // socket.id -> playerId
 let waitingLobby = []; 
 let activeRooms = {};
 
-const ADMIN_PASSWORD = "izzatbek2006"; // Kassa paroli
+const ADMIN_PASSWORD = "izzatbek2006"; 
 const OSHIQ_SIDES = ["Oʻng", "Chap", "Tik oʻng", "Tik chap"];
 
 function getAdminPlayersList() {
-    return Object.values(dbPlayers).map(p => ({
+    return Object.values(dbData.players).map(p => ({
         id: p.id,
         name: p.name,
         balance: p.balance
@@ -37,7 +56,7 @@ io.on('connection', (socket) => {
     socket.on('admin_login', (pass) => {
         if(pass === ADMIN_PASSWORD) {
             socket.emit('admin_auth_success', {
-                profit: companyProfit,
+                profit: dbData.companyProfit,
                 players: getAdminPlayersList()
             });
             socket.join('admin_room');
@@ -46,9 +65,9 @@ io.on('connection', (socket) => {
         }
     });
 
-    // ADMIN: Balansni plyus/minus qilish
+    // ADMIN: Balansni o'zgartirish
     socket.on('admin_modify_balance', (data) => {
-        const player = dbPlayers[data.id];
+        const player = dbData.players[data.id];
         if (!player) return socket.emit('error_msg', 'Oʻyinchi topilmadi!');
 
         if (data.type === 'plus') {
@@ -58,7 +77,8 @@ io.on('connection', (socket) => {
             if(player.balance < 0) player.balance = 0;
         }
 
-        // Agar o'yinchi onlayn bo'lsa, ekranida balansni jonli yangilash
+        saveToDatabase(); // Faylga saqlash
+
         for (let sId in onlineSockets) {
             if (onlineSockets[sId] === data.id) {
                 io.to(sId).emit('balance_updated', player.balance);
@@ -69,25 +89,33 @@ io.on('connection', (socket) => {
         socket.emit('admin_action_success', `Muvaffaqiyatli bajarildi! Yangi balans: ${player.balance.toLocaleString()} so'm`);
     });
 
-    // OʻYINCHI: Kirish yoki yangi ID olish
+    // OʻYINCHI: Kirish yoki avtomatik ID tekshirish
     socket.on('register_player', (data) => {
-        if (!data.name || data.name.trim() === "") {
-            return socket.emit('error_msg', 'Iltimos, ismingizni kiriting!');
-        }
-
         let player;
-        if (data.id && dbPlayers[data.id]) {
-            player = dbPlayers[data.id];
+        
+        // Agar mijozda eski saqlangan ID bo'lsa va u bazada bor bo'lsa
+        if (data.id && dbData.players[data.id]) {
+            player = dbData.players[data.id];
+            // Agar ismini yangilamoqchi bo'lsa
+            if (data.name && data.name.trim() !== "") {
+                player.name = data.name;
+            }
         } else {
-            let newId = nextPlayerId++;
+            // Yangi akkaunt yaratish
+            if (!data.name || data.name.trim() === "") {
+                return socket.emit('error_msg', 'Iltimos, ismingizni kiriting!');
+            }
+            let newId = dbData.nextPlayerId++;
             player = {
                 id: newId,
                 name: data.name,
-                balance: 500000, // Boshlang'ich balans
+                balance: 500000, 
                 status: "idle"
             };
-            dbPlayers[newId] = player;
+            dbData.players[newId] = player;
         }
+
+        saveToDatabase(); // Faylga saqlash
 
         onlineSockets[socket.id] = player.id;
         player.status = "idle";
@@ -105,7 +133,7 @@ io.on('connection', (socket) => {
     // OʻYINCHI: Raqib qidirish
     socket.on('find_opponent', (betAmount) => {
         const pId = onlineSockets[socket.id];
-        const player = dbPlayers[pId];
+        const player = dbData.players[pId];
         if (!player) return;
 
         const bet = parseInt(betAmount);
@@ -115,22 +143,21 @@ io.on('connection', (socket) => {
 
         player.status = "searching";
         
-        // Faqat bir xil stavkadagi va aktiv qidirayotgan raqibni topish
-        let opponentData = waitingLobby.find(w => w.bet === bet && w.socketId !== socket.id && dbPlayers[w.playerId]?.status === "searching");
+        let opponentData = waitingLobby.find(w => w.bet === bet && w.socketId !== socket.id && dbData.players[w.playerId]?.status === "searching");
 
         if (opponentData) {
             waitingLobby = waitingLobby.filter(w => w.socketId !== opponentData.socketId);
             const roomId = "room_" + Date.now();
             
             player.status = "playing";
-            dbPlayers[opponentData.playerId].status = "playing";
+            dbData.players[opponentData.playerId].status = "playing";
 
             activeRooms[roomId] = {
                 id: roomId,
                 bet: bet,
                 players: [
                     { socketId: socket.id, id: player.id, name: player.name, result: null },
-                    { socketId: opponentData.socketId, id: opponentData.playerId, name: dbPlayers[opponentData.playerId].name, result: null }
+                    { socketId: opponentData.socketId, id: opponentData.playerId, name: dbData.players[opponentData.playerId].name, result: null }
                 ],
                 timeoutId: null
             };
@@ -143,10 +170,9 @@ io.on('connection', (socket) => {
                 roomId: roomId, 
                 bet: bet,
                 p1: player.name,
-                p2: dbPlayers[opponentData.playerId].name
+                p2: dbData.players[opponentData.playerId].name
             });
 
-            // ⏰ 15 soniyalik taymerni serverda ishga tushirish (uxlab qolishga qarshi)
             activeRooms[roomId].timeoutId = setTimeout(() => {
                 handleRoomTimeout(roomId);
             }, 15000);
@@ -175,7 +201,6 @@ io.on('connection', (socket) => {
 
         io.to(roomId).emit('player_rolled', { name: room.players[pIndex].name });
 
-        // Agar har ikkala o'yinchi ham tosh tashlagan bo'lsa, taymerni bekor qilib g'olibni aniqlash
         if (room.players[0].result !== null && room.players[1].result !== null) {
             if (room.timeoutId) clearTimeout(room.timeoutId);
             evaluateWinner(room);
@@ -184,7 +209,6 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         waitingLobby = waitingLobby.filter(w => w.socketId !== socket.id);
-        // Agar o'yinchi faol xonada bo'lsa, o'yinni buzish
         for (let roomId in activeRooms) {
             let room = activeRooms[roomId];
             let pIndex = room.players.findIndex(p => p.socketId === socket.id);
@@ -198,24 +222,18 @@ io.on('connection', (socket) => {
     });
 });
 
-// ⏰ Uxlab qolgan (yoki chiqib ketgan) o'yinchi uchun taymer funksiyasi
 function handleRoomTimeout(roomId) {
     const room = activeRooms[roomId];
     if (!room) return;
 
-    // Tosh tashlamay kechikkan o'yinchini aniqlash
     let slacker = room.players.find(p => p.result === null);
     let activePlayer = room.players.find(p => p.result !== null || p.id !== slacker?.id);
 
-    io.to(roomId).emit('error_msg', 'Oʻyinchilardan biri 15 soniya ichida harakat qilmadi! Oʻyin bekor qilindi va faol oʻyinchi qayta qidiruvga oʻtkazildi.');
+    io.to(roomId).emit('error_msg', 'Oʻyinchilardan biri 15 soniya ichida harakat qilmadi! Oʻyin bekor qilindi.');
     io.to(roomId).emit('force_cancel_game');
 
-    if (activePlayer && dbPlayers[activePlayer.id]) {
-        dbPlayers[activePlayer.id].status = "idle";
-    }
-    if (slacker && dbPlayers[slacker.id]) {
-        dbPlayers[slacker.id].status = "idle";
-    }
+    if (activePlayer && dbData.players[activePlayer.id]) dbData.players[activePlayer.id].status = "idle";
+    if (slacker && dbData.players[slacker.id]) dbData.players[slacker.id].status = "idle";
 
     delete activeRooms[roomId];
 }
@@ -245,8 +263,8 @@ function evaluateWinner(room) {
     let tax = Math.round(totalPool * 0.03);
     let netPrize = totalPool - tax;
 
-    let p1Data = dbPlayers[p1.id];
-    let p2Data = dbPlayers[p2.id];
+    let p1Data = dbData.players[p1.id];
+    let p2Data = dbData.players[p2.id];
     
     let winnerId = null;
     let finalStatusText = "";
@@ -272,8 +290,8 @@ function evaluateWinner(room) {
     }
 
     if (winnerId) {
-        companyProfit += tax;
-        io.to('admin_room').emit('update_profit', companyProfit);
+        dbData.companyProfit += tax; // Kassaga tushgan soliq puli
+        io.to('admin_room').emit('update_profit', dbData.companyProfit);
         
         if (winnerId === p1.id) {
             if (p1Data) p1Data.balance += (netPrize - bet);
@@ -283,6 +301,8 @@ function evaluateWinner(room) {
             if (p1Data) p1Data.balance -= bet;
         }
     }
+
+    saveToDatabase(); // Har o'yin tugaganda natijalarni faylga muhrlash
 
     io.to(room.id).emit('game_over', {
         result: finalStatusText,
@@ -298,4 +318,4 @@ function evaluateWinner(room) {
 }
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log('OSHQ OʻYIN serveri tayyor.'));
+server.listen(PORT, () => console.log('OSHQ OʻYIN serveri doimiy faylli baza bilan tayyor.'));
