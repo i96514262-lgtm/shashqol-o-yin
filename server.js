@@ -2,7 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-const fs = require('fs'); // Fayllar bilan ishlash uchun modul
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -10,7 +10,6 @@ const io = new Server(server, { cors: { origin: "*" } });
 
 const DB_FILE = path.join(__dirname, 'database.json');
 
-// Baza faylini yuklash yoki yangi yaratish
 let dbData = {
     players: {},
     nextPlayerId: 1001,
@@ -26,12 +25,11 @@ if (fs.existsSync(DB_FILE)) {
     }
 }
 
-// Ma'lumotlarni faylga saqlash funksiyasi
 function saveToDatabase() {
     fs.writeFileSync(DB_FILE, JSON.stringify(dbData, null, 2), 'utf8');
 }
 
-let onlineSockets = {}; // socket.id -> playerId
+let onlineSockets = {}; 
 let waitingLobby = []; 
 let activeRooms = {};
 
@@ -52,7 +50,6 @@ app.get('/', (req, res) => {
 
 io.on('connection', (socket) => {
 
-    // ADMIN: Tizimga kirish
     socket.on('admin_login', (pass) => {
         if(pass === ADMIN_PASSWORD) {
             socket.emit('admin_auth_success', {
@@ -65,7 +62,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // ADMIN: Balansni o'zgartirish
     socket.on('admin_modify_balance', (data) => {
         const player = dbData.players[data.id];
         if (!player) return socket.emit('error_msg', 'Oʻyinchi topilmadi!');
@@ -77,7 +73,7 @@ io.on('connection', (socket) => {
             if(player.balance < 0) player.balance = 0;
         }
 
-        saveToDatabase(); // Faylga saqlash
+        saveToDatabase();
 
         for (let sId in onlineSockets) {
             if (onlineSockets[sId] === data.id) {
@@ -89,19 +85,15 @@ io.on('connection', (socket) => {
         socket.emit('admin_action_success', `Muvaffaqiyatli bajarildi! Yangi balans: ${player.balance.toLocaleString()} so'm`);
     });
 
-    // OʻYINCHI: Kirish yoki avtomatik ID tekshirish
     socket.on('register_player', (data) => {
         let player;
         
-        // Agar mijozda eski saqlangan ID bo'lsa va u bazada bor bo'lsa
         if (data.id && dbData.players[data.id]) {
             player = dbData.players[data.id];
-            // Agar ismini yangilamoqchi bo'lsa
             if (data.name && data.name.trim() !== "") {
                 player.name = data.name;
             }
         } else {
-            // Yangi akkaunt yaratish
             if (!data.name || data.name.trim() === "") {
                 return socket.emit('error_msg', 'Iltimos, ismingizni kiriting!');
             }
@@ -109,13 +101,13 @@ io.on('connection', (socket) => {
             player = {
                 id: newId,
                 name: data.name,
-                balance: 500000, 
+                balance: 0, // 🔥 Yangi kirganda hisobi 0 so'm bo'ladi!
                 status: "idle"
             };
             dbData.players[newId] = player;
         }
 
-        saveToDatabase(); // Faylga saqlash
+        saveToDatabase();
 
         onlineSockets[socket.id] = player.id;
         player.status = "idle";
@@ -130,7 +122,6 @@ io.on('connection', (socket) => {
         io.to('admin_room').emit('admin_players_update', getAdminPlayersList());
     });
 
-    // OʻYINCHI: Raqib qidirish
     socket.on('find_opponent', (betAmount) => {
         const pId = onlineSockets[socket.id];
         const player = dbData.players[pId];
@@ -138,7 +129,7 @@ io.on('connection', (socket) => {
 
         const bet = parseInt(betAmount);
         if (player.balance < bet) {
-            return socket.emit('error_msg', 'Mablagʻingiz yetarli emas!');
+            return socket.emit('error_msg', 'Mablagʻingiz yetarli emas! Iltimos, kassirga murojaat qiling.');
         }
 
         player.status = "searching";
@@ -183,7 +174,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // OʻYINCHI: Oshiq tashlash
     socket.on('roll_dice', (roomId) => {
         const room = activeRooms[roomId];
         if (!room) return;
@@ -290,7 +280,7 @@ function evaluateWinner(room) {
     }
 
     if (winnerId) {
-        dbData.companyProfit += tax; // Kassaga tushgan soliq puli
+        dbData.companyProfit += tax; 
         io.to('admin_room').emit('update_profit', dbData.companyProfit);
         
         if (winnerId === p1.id) {
@@ -302,7 +292,7 @@ function evaluateWinner(room) {
         }
     }
 
-    saveToDatabase(); // Har o'yin tugaganda natijalarni faylga muhrlash
+    saveToDatabase();
 
     io.to(room.id).emit('game_over', {
         result: finalStatusText,
@@ -318,4 +308,4 @@ function evaluateWinner(room) {
 }
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log('OSHQ OʻYIN serveri doimiy faylli baza bilan tayyor.'));
+server.listen(PORT, () => console.log('OSHQ OʻYIN serveri yangilandi.'));
