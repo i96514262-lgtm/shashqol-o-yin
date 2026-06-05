@@ -14,21 +14,17 @@
         .bet-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
         .bet-btn { padding: 18px; border: none; border-radius: 10px; background: #1e88e5; color: white; cursor: pointer; font-weight: bold; }
         .bet-btn-long { grid-column: span 2; background: #1565c0; }
-        #timer { text-align: center; font-size: 2em; color: #ff4757; margin-top: 20px; }
+        #timer { text-align: center; font-size: 3em; color: #ff4757; margin-top: 10px; }
     </style>
 </head>
 <body>
-
     <div class="header">
         <div class="id-box">ID: 887766</div>
-        <div class="online-players">👥 Onlayn: <span id="count">0</span></div>
+        <div class="online-players">👥 1,245</div>
         <div class="balance-box">💲 300,000</div>
     </div>
-
     <div class="tax-bar">KAMPANIYA SOLIGʻI: 2%</div>
-
     <div id="timer">20</div>
-
     <div class="bet-grid">
         <button class="bet-btn" onclick="placeBet(50000)">50 000</button>
         <button class="bet-btn" onclick="placeBet(100000)">100 000</button>
@@ -39,17 +35,9 @@
 
     <script>
         const socket = io();
-        
-        // Timer'ni qabul qilish
-        socket.on('timer', (time) => {
-            document.getElementById('timer').innerText = time;
-        });
-
-        // Tikish funksiyasi
-        function placeBet(amount) {
-            socket.emit('placeBet', amount);
-            alert("Siz " + amount + " so'm tikdingiz!");
-        }
+        socket.on('timer', (time) => { document.getElementById('timer').innerText = time; });
+        function placeBet(amount) { socket.emit('placeBet', amount); }
+        socket.on('gameResult', (msg) => { alert(msg); });
     </script>
 </body>
 </html>
