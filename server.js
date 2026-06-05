@@ -11,19 +11,16 @@ const io = new Server(server, { cors: { origin: "*" } });
 const DB_FILE = path.join(__dirname, 'database.json');
 
 let dbData = {
-    players: {}, // O'yinchilar bazasi
-    usedIds: [], // Band bo'lgan 6 xonali ID'lar ro'yxati
+    players: {},
+    nextPlayerId: 100000, // 🔥 6 xonali ID raqam shu yerdan boshlanadi
     companyProfit: 0
 };
 
-// Bazani yuklash
 if (fs.existsSync(DB_FILE)) {
     try {
-        const fileContent = fs.readFileSync(DB_FILE, 'utf8');
-        dbData = JSON.parse(fileContent);
-        if (!dbData.usedIds) dbData.usedIds = Object.keys(dbData.players);
+        dbData = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
     } catch (e) {
-        console.log("Baza faylini o'qishda xato, yangi ochiladi.");
+        console.log("Baza o'qishda xato.");
     }
 }
 
@@ -31,21 +28,11 @@ function saveToDatabase() {
     fs.writeFileSync(DB_FILE, JSON.stringify(dbData, null, 2), 'utf8');
 }
 
-// 6 xonali takrorlanmas ID yaratish funksiyasi
-function generateUniqueId() {
-    let id;
-    do {
-        id = Math.floor(100000 + Math.random() * 900000).toString(); // 100000 dan 999999 gacha
-    } while (dbData.usedIds.includes(id));
-    dbData.usedIds.push(id);
-    return id;
-}
-
 let onlineSockets = {}; 
 let waitingLobby = []; 
 let activeRooms = {};
 
-const ADMIN_PASSWORD = "0613"; // 🔥 Admin paroli o'zgartirildi!
+const ADMIN_PASSWORD = "0613";
 const OSHIQ_SIDES = ["Oʻng", "Chap", "Tik oʻng", "Tik chap"];
 
 function getAdminPlayersList() {
@@ -62,7 +49,7 @@ app.get('/', (req, res) => {
 
 io.on('connection', (socket) => {
 
-    // --- ADMIN PANEL ---
+    // ADMIN TIZIMI
     socket.on('admin_login', (pass) => {
         if(pass === ADMIN_PASSWORD) {
             socket.emit('admin_auth_success', {
@@ -77,57 +64,46 @@ io.on('connection', (socket) => {
 
     socket.on('admin_modify_balance', (data) => {
         const player = dbData.players[data.id];
-        if (!player) return socket.emit('error_msg', 'Oʻyinchi topilmadi!');
-
-        if (data.type === 'plus') {
-            player.balance += data.amount;
-        } else if (data.type === 'minus') {
+        if (!player) return;
+        if (data.type === 'plus') player.balance += data.amount;
+        if (data.type === 'minus') {
             player.balance -= data.amount;
             if(player.balance < 0) player.balance = 0;
         }
-
         saveToDatabase();
-
+        
         for (let sId in onlineSockets) {
-            if (onlineSockets[sId] === data.id) {
+            if (onlineSockets[sId] === parseInt(data.id)) {
                 io.to(sId).emit('balance_updated', player.balance);
             }
         }
-
         io.to('admin_room').emit('admin_players_update', getAdminPlayersList());
-        socket.emit('admin_action_success', `Muvaffaqiyatli bajarildi! Yangi balans: ${player.balance.toLocaleString()} so'm`);
     });
 
-    // --- AKKAUNT RO'YXATDAN O'TISH VA KIRISH (AVTOMATIK TIZIM) ---
+    // 🔐 RO'YXATDAN O'TISH VA TIZIMGA KIRISH (PAROL BILAN)
     socket.on('register_player', (data) => {
         let player;
 
-        // 1. Agar foydalanuvchi tizimga qayta kirayotgan bo'lsa (ID va Parol bilan)
-        if (data.id && dbData.players[data.id]) {
-            let existingPlayer = dbData.players[data.id];
+        if (data.id) {
+            // Eski foydalanuvchi ID orqali kirmoqchi bo'lganda
+            player = dbData.players[data.id];
+            if (!player) {
+                return socket.emit('error_msg', 'Bunday ID raqamli profil mavjud emas!');
+            }
+            if (player.password !== data.password) {
+                return socket.emit('error_msg', 'Xato parol kiritildi!');
+            }
+        } else {
+            // Yangi foydalanuvchi ro'yxatdan o'tayotganda
+            if (!data.name || data.name.trim() === "") return socket.emit('error_msg', 'Ism kiriting!');
+            if (!data.password || data.password.length !== 4) return socket.emit('error_msg', 'Parol 4 xonali boʻlsin!');
 
-            // Parolni tekshirish
-            if (existingPlayer.password !== data.password) {
-                return socket.emit('error_msg', 'Xato ID yoki Parol kiritildi!');
-            }
-            player = existingPlayer;
-        } 
-        // 2. Agar foydalanuvchi birinchi marta kirayotgan bo'lsa (Yangi akkaunt)
-        else {
-            if (!data.name || data.name.trim() === "") {
-                return socket.emit('error_msg', 'Iltimos, ismingizni kiriting!');
-            }
-            if (!data.password || data.password.toString().length !== 4) {
-                return socket.emit('error_msg', 'Parol aniq 4 ta raqamdan iborat boʻlishi shart!');
-            }
-
-            let newId = generateUniqueId(); // 6 xonali ID yaratish
-            
+            let newId = dbData.nextPlayerId++;
             player = {
                 id: newId,
-                name: data.name.trim(),
-                password: data.password.toString(), // 4 xonali parol
-                balance: 0, 
+                name: data.name,
+                password: data.password, // O'zgartirib bo'lmaydi
+                balance: 0,
                 status: "idle"
             };
             dbData.players[newId] = player;
@@ -137,36 +113,29 @@ io.on('connection', (socket) => {
         onlineSockets[socket.id] = player.id;
         player.status = "idle";
 
-        // Muvaffaqiyatli kirganda ma'lumotlarni telefonga qaytarish
         socket.emit('register_success', {
             id: player.id,
             name: player.name,
             balance: player.balance
         });
 
-        io.emit('online_count', Object.keys(onlineSockets).length);
         io.to('admin_room').emit('admin_players_update', getAdminPlayersList());
     });
 
-    // --- RAQIB QIDIRISH ---
+    // O'YIN TIKISh LOGIKASI
     socket.on('find_opponent', (betAmount) => {
         const pId = onlineSockets[socket.id];
         const player = dbData.players[pId];
         if (!player) return;
 
         const bet = parseInt(betAmount);
-        
-        // Botlar uchun cheksiz balans (Ismida 'Bot' so'zi bo'lsa)
         if (player.name && player.name.includes("Bot")) {
-            player.balance = 1000000; 
+            player.balance = 1000000;
         } else {
-            if (player.balance < bet) {
-                return socket.emit('error_msg', 'Mablagʻingiz yetarli emas! Kassirga murojaat qiling.');
-            }
+            if (player.balance < bet) return socket.emit('error_msg', 'Mablagʻ yetarli emas!');
         }
 
         player.status = "searching";
-        
         let opponentData = waitingLobby.find(w => w.bet === bet && w.socketId !== socket.id && dbData.players[w.playerId]?.status === "searching");
 
         if (opponentData) {
@@ -182,85 +151,40 @@ io.on('connection', (socket) => {
                 players: [
                     { socketId: socket.id, id: player.id, name: player.name, result: null },
                     { socketId: opponentData.socketId, id: opponentData.playerId, name: dbData.players[opponentData.playerId].name, result: null }
-                ],
-                timeoutId: null
+                ]
             };
 
             const oppSocket = io.sockets.sockets.get(opponentData.socketId);
             if (oppSocket) oppSocket.join(roomId);
             socket.join(roomId);
 
-            io.to(roomId).emit('game_start', { 
-                roomId: roomId, 
-                bet: bet,
-                p1: player.name,
-                p2: dbData.players[opponentData.playerId].name
-            });
-
-            activeRooms[roomId].timeoutId = setTimeout(() => {
-                handleRoomTimeout(roomId);
-            }, 15000);
-
+            io.to(roomId).emit('game_start', { roomId: roomId, bet: bet, p1: player.name, p2: dbData.players[opponentData.playerId].name });
         } else {
             waitingLobby.push({ socketId: socket.id, playerId: player.id, bet: bet });
-            socket.emit('waiting_mode', 'Raqib qidirilmoqda...');
         }
     });
 
-    // --- TOSHLARNI TASHALASH ---
     socket.on('roll_dice', (roomId) => {
         const room = activeRooms[roomId];
         if (!room) return;
-
         const pIndex = room.players.findIndex(p => p.socketId === socket.id);
         if (pIndex === -1 || room.players[pIndex].result !== null) return;
 
         let rolledSides = [];
-        for (let i = 0; i < 4; i++) {
-            rolledSides.push(OSHIQ_SIDES[Math.floor(Math.random() * 4)]);
-        }
-
+        for (let i = 0; i < 4; i++) rolledSides.push(OSHIQ_SIDES[Math.floor(Math.random() * 4)]);
         let evaluation = evaluateOshiq(rolledSides);
         room.players[pIndex].result = { score: evaluation.score, statusName: evaluation.statusName, isChu: evaluation.isChu };
 
-        io.to(roomId).emit('player_rolled', { name: room.players[pIndex].name });
-
         if (room.players[0].result !== null && room.players[1].result !== null) {
-            if (room.timeoutId) clearTimeout(room.timeoutId);
             evaluateWinner(room);
         }
     });
 
     socket.on('disconnect', () => {
         waitingLobby = waitingLobby.filter(w => w.socketId !== socket.id);
-        for (let roomId in activeRooms) {
-            let room = activeRooms[roomId];
-            let pIndex = room.players.findIndex(p => p.socketId === socket.id);
-            if (pIndex !== -1) {
-                if (room.timeoutId) clearTimeout(room.timeoutId);
-                handleRoomTimeout(roomId);
-            }
-        }
         delete onlineSockets[socket.id];
-        io.emit('online_count', Object.keys(onlineSockets).length);
     });
 });
-
-function handleRoomTimeout(roomId) {
-    const room = activeRooms[roomId];
-    if (!room) return;
-
-    let slacker = room.players.find(p => p.result === null);
-    let activePlayer = room.players.find(p => p.result !== null || p.id !== slacker?.id);
-
-    io.to(roomId).emit('error_msg', 'Oʻyinchilardan biri 15 soniya ichida harakat qilmadi! Oʻyin bekor qilindi.');
-    io.to(roomId).emit('force_cancel_game');
-
-    if (activePlayer && dbData.players[activePlayer.id]) dbData.players[activePlayer.id].status = "idle";
-    if (slacker && dbData.players[slacker.id]) dbData.players[slacker.id].status = "idle";
-
-    delete activeRooms[roomId];
-}
 
 function evaluateOshiq(sides) {
     let counts = { "Oʻng": 0, "Chap": 0, "Tik oʻng": 0, "Tik chap": 0 };
@@ -282,14 +206,12 @@ function evaluateWinner(room) {
     const p1 = room.players[0];
     const p2 = room.players[1];
     const bet = room.bet;
-    
     let totalPool = bet * 2;
     let tax = Math.round(totalPool * 0.03);
     let netPrize = totalPool - tax;
 
     let p1Data = dbData.players[p1.id];
     let p2Data = dbData.players[p2.id];
-    
     let winnerId = null;
     let finalStatusText = "";
 
@@ -314,9 +236,8 @@ function evaluateWinner(room) {
     }
 
     if (winnerId) {
-        dbData.companyProfit += tax; 
+        dbData.companyProfit += tax;
         io.to('admin_room').emit('update_profit', dbData.companyProfit);
-        
         if (winnerId === p1.id) {
             if (p1Data) p1Data.balance += (netPrize - bet);
             if (p2Data) p2Data.balance -= bet;
@@ -336,22 +257,12 @@ function evaluateWinner(room) {
 
     if (p1Data) p1Data.status = "idle";
     if (p2Data) p2Data.status = "idle";
-    
     io.to('admin_room').emit('admin_players_update', getAdminPlayersList());
     delete activeRooms[room.id];
 }
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log('OSHQ OʻYIN serveri yangilandi.');
-    
-    // Botlarni server ichida avtomat yoqish
-    try {
-        if (fs.existsSync(path.join(__dirname, 'bots.js'))) {
-            require('./bots.js');
-            console.log("Botlar tizimi muvaffaqiyatli serverga ulandi.");
-        }
-    } catch (e) {
-        console.log("Botlarni yoqishda xatolik:", e);
-    }
+    console.log('Server ishga tushdi.');
+    try { if (fs.existsSync(path.join(__dirname, 'bots.js'))) require('./bots.js'); } catch (e) {}
 });
