@@ -2,42 +2,122 @@
 <html lang="uz">
 <head>
     <meta charset="UTF-8">
-    <title>Suyak O'yini</title>
+    <title>Shashqol O'yin</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         body { background-color: #1a1a2e; color: white; font-family: sans-serif; margin: 0; padding: 15px; }
+        
+        /* Login Oynasi */
+        #login-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh; }
+        .input-box { margin: 10px; padding: 15px; width: 80%; border-radius: 8px; border: none; font-size: 1.2em; }
+        .login-btn { padding: 15px 30px; background: #2e7d32; color: white; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; }
+        
+        /* O'yin Oynasi */
+        #game-screen { display: none; }
         .header { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #333; }
         .id-box { color: #00d2ff; font-weight: bold; }
         .online-players { color: #ffd700; font-weight: bold; }
         .balance-box { color: #ffeb3b; font-weight: bold; }
+        
         .tax-bar { background: #2e7d32; color: white; text-align: center; padding: 12px; border-radius: 8px; margin: 20px 0; font-weight: bold; }
+        
+        #timer { text-align: center; font-size: 3em; color: #ff4757; margin-bottom: 20px; font-weight: bold;}
+        #logs { background: #111; padding: 10px; height: 100px; overflow-y: scroll; margin-bottom: 20px; border-radius: 8px; color: #00d2ff; }
+        
         .bet-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-        .bet-btn { padding: 18px; border: none; border-radius: 10px; background: #1e88e5; color: white; cursor: pointer; font-weight: bold; }
+        .bet-btn { padding: 18px; border: none; border-radius: 10px; background: #1e88e5; color: white; cursor: pointer; font-weight: bold; font-size: 1.1em;}
         .bet-btn-long { grid-column: span 2; background: #1565c0; }
-        #timer { text-align: center; font-size: 3em; color: #ff4757; margin-top: 10px; }
+        .bet-btn:active { background: #0d47a1; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="id-box">ID: 887766</div>
-        <div class="online-players">👥 1,245</div>
-        <div class="balance-box">💲 300,000</div>
+
+    <div id="login-screen">
+        <h2 style="color: #ffd700;">Shashqolga Xush Kelibsiz</h2>
+        <input type="text" id="username" class="input-box" placeholder="Ismingizni kiriting...">
+        <input type="number" id="password" class="input-box" placeholder="4 xonali parol (Masalan: 1234)">
+        <button class="login-btn" onclick="login()">O'yinga Kirish</button>
     </div>
-    <div class="tax-bar">KAMPANIYA SOLIGʻI: 2%</div>
-    <div id="timer">20</div>
-    <div class="bet-grid">
-        <button class="bet-btn" onclick="placeBet(50000)">50 000</button>
-        <button class="bet-btn" onclick="placeBet(100000)">100 000</button>
-        <button class="bet-btn" onclick="placeBet(300000)">300 000</button>
-        <button class="bet-btn" onclick="placeBet(700000)">700 000</button>
-        <button class="bet-btn bet-btn-long" onclick="placeBet(1000000)">1 000 000</button>
+
+    <div id="game-screen">
+        <div class="header">
+            <div class="id-box" id="my-id">ID: Yuklanmoqda...</div>
+            <div class="online-players">👥 <span id="online-count">0</span></div>
+            <div class="balance-box">💲 <span id="my-balance">0</span></div>
+        </div>
+
+        <div class="tax-bar">KAMPANIYA SOLIGʻI: 2%</div>
+
+        <div id="timer">20</div>
+        
+        <div id="logs">O'yin voqealari...</div>
+
+        <div class="bet-grid">
+            <button class="bet-btn" onclick="placeBet(50000)">50 000</button>
+            <button class="bet-btn" onclick="placeBet(100000)">100 000</button>
+            <button class="bet-btn" onclick="placeBet(300000)">300 000</button>
+            <button class="bet-btn" onclick="placeBet(700000)">700 000</button>
+            <button class="bet-btn bet-btn-long" onclick="placeBet(1000000)">1 000 000</button>
+        </div>
     </div>
 
     <script>
         const socket = io();
-        socket.on('timer', (time) => { document.getElementById('timer').innerText = time; });
-        function placeBet(amount) { socket.emit('placeBet', amount); }
-        socket.on('gameResult', (msg) => { alert(msg); });
+        let currentBalance = 0;
+
+        function login() {
+            let name = document.getElementById('username').value;
+            let pass = document.getElementById('password').value;
+            if(name && pass.length === 4) {
+                socket.emit('login', { name: name, password: pass });
+            } else {
+                alert("Ism va 4 xonali parol kiritilishi shart!");
+            }
+        }
+
+        socket.on('loginSuccess', (userData) => {
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('game-screen').style.display = 'block';
+            document.getElementById('my-id').innerText = "ID: " + userData.id;
+            document.getElementById('my-balance').innerText = userData.balance.toLocaleString();
+            currentBalance = userData.balance;
+        });
+
+        socket.on('updateOnline', (count) => {
+            document.getElementById('online-count').innerText = count;
+        });
+
+        socket.on('timer', (time) => {
+            document.getElementById('timer').innerText = time;
+        });
+
+        function placeBet(amount) {
+            if (currentBalance >= amount) {
+                socket.emit('placeBet', amount);
+            } else {
+                alert("Pul yetarli emas! Admin hisob to'ldirishi kerak.");
+            }
+        }
+
+        socket.on('balanceUpdated', (newBalance) => {
+            currentBalance = newBalance;
+            document.getElementById('my-balance').innerText = currentBalance.toLocaleString();
+        });
+
+        socket.on('newBet', (msg) => {
+            let logs = document.getElementById('logs');
+            logs.innerHTML += `<br>🔸 ${msg}`;
+            logs.scrollTop = logs.scrollHeight;
+        });
+
+        socket.on('gameResult', (data) => {
+            let logs = document.getElementById('logs');
+            logs.innerHTML += `<br><br><b>🎲 Suyaklar: [${data.dices.join(', ')}] - ${data.result}</b>`;
+            logs.innerHTML += `<br>🏆 G'olib: ${data.winner} (+${data.winAmount.toLocaleString()} so'm)`;
+            logs.scrollTop = logs.scrollHeight;
+        });
+
+        socket.on('errorMsg', (msg) => alert(msg));
     </script>
 </body>
 </html>
