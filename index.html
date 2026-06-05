@@ -1,40 +1,54 @@
 <!DOCTYPE html>
-<html>
+<html lang="uz">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shashqol</title>
+    <title>O'yin</title>
     <style>
-        body { background: #121212; color: #fff; font-family: Arial; text-align: center; }
-        .card { background: #1e1e2f; padding: 20px; border-radius: 15px; width: 90%; max-width: 300px; margin: 20px auto; }
-        button { background: #4CAF50; border: none; padding: 15px; color: white; width: 100%; border-radius: 8px; margin-top: 10px; font-weight: bold; }
-        input { padding: 10px; border-radius: 5px; border: none; width: 80%; }
+        body { background-color: #1a1a2e; color: white; font-family: sans-serif; margin: 0; padding: 15px; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: #16213e; padding: 10px; border-radius: 8px; font-weight: bold; }
+        .tax-panel { background: #28a745; text-align: center; padding: 15px; margin: 15px 0; border-radius: 8px; font-weight: bold; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .btn-bet { background: #1e88e5; border: none; padding: 20px; color: white; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .btn-full { grid-column: span 2; background: #1e88e5; border: none; padding: 20px; color: white; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .game-status { background: #16213e; padding: 20px; margin-top: 20px; border-radius: 8px; text-align: center; font-weight: bold; }
+        .btn-yellow { background: #ffc107; color: black; width: 100%; padding: 20px; border: none; font-size: 1.2rem; font-weight: bold; margin-top: 15px; border-radius: 8px; cursor: pointer; }
     </style>
 </head>
 <body>
-    <div id="auth" class="card">
-        <input id="name" placeholder="Ismingizni yozing"><br>
-        <button onclick="login()">KIRISH</button>
+    <div class="header">
+        <span>ID: 887766</span>
+        <span>👥 1,245</span>
+        <span id="balance">$ 300,000</span>
     </div>
-    <div id="game" class="card" style="display:none">
-        <h1 id="timer">20</h1>
-        <h2 id="bal">Balans: 0</h2>
-        <button onclick="bet(50000)">50 000 TIKISH</button>
+    <div class="tax-panel">KAMPANIYA SOLIG'I: 2%</div>
+    <div class="grid">
+        <button class="btn-bet" onclick="selectBet(50000)">50 000</button>
+        <button class="btn-bet" onclick="selectBet(100000)">100 000</button>
+        <button class="btn-bet" onclick="selectBet(300000)">300 000</button>
+        <button class="btn-bet" onclick="selectBet(700000)">700 000</button>
+        <button class="btn-full" onclick="selectBet(1000000)">1 000 000</button>
     </div>
-    <script src="/socket.io/socket.io.js"></script>
+    <div class="game-status" id="status">Summani tanlang</div>
+    <button class="btn-yellow" onclick="placeBet()">GAROV TIKISH</button>
+    <a href="/admin" style="display: block; margin-top: 20px; color: #555; text-align: center; font-size: 10px;">Admin Panel</a>
+
     <script>
-        const socket = io();
-        function login() {
-            socket.emit('login', document.getElementById('name').value);
+        let currentBalance = 300000;
+        let selectedAmount = 0;
+        function selectBet(amount) {
+            selectedAmount = amount;
+            document.getElementById('status').innerText = amount.toLocaleString() + " so'm tanlandi.";
         }
-        socket.on('auth', (u) => {
-            document.getElementById('auth').style.display = 'none';
-            document.getElementById('game').style.display = 'block';
-            document.getElementById('bal').innerText = "Balans: " + u.balance;
-        });
-        function bet(amt) { socket.emit('bet', amt); }
-        socket.on('update', (b) => document.getElementById('bal').innerText = "Balans: " + b);
-        socket.on('timer', (t) => document.getElementById('timer').innerText = t);
+        function placeBet() {
+            if (selectedAmount > 0 && currentBalance >= selectedAmount) {
+                currentBalance -= selectedAmount;
+                document.getElementById('balance').innerText = "$ " + currentBalance.toLocaleString();
+                alert("Garov qabul qilindi!");
+            } else {
+                alert("Summani tanlang yoki mablag' yetarli emas!");
+            }
+        }
     </script>
 </body>
 </html>
