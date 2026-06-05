@@ -18,7 +18,7 @@
         .id-badge { background: #f77f00; color: white; padding: 5px 12px; border-radius: 20px; display: inline-block; font-size: 0.9rem; font-weight: bold; margin-bottom: 10px; }
         .timer-badge { color: #ef4444; font-weight: bold; font-size: 1.2rem; display: block; margin: 10px 0; }
         
-        /* Admin Kassa Dizayni */
+        /* Admin Kassa */
         .admin-box { background: #111827; border: 2px solid #22c55e; max-width: 500px; }
         .search-input { background: #1f2937; border: 1px solid #4b5563; }
         .player-list-admin { text-align: left; max-height: 250px; overflow-y: auto; margin-top: 15px; background: #1f2937; padding: 10px; border-radius: 8px; }
@@ -30,11 +30,12 @@
 </head>
 <body>
 
+<!-- 🗂 KIRISH EKRANI -->
 <div class="box" id="login-screen">
     <h2>🎯 OSHQ OʻYIN TIZIMI</h2>
-    <p>Akkauntga kirish yoki yangi ochish:</p>
-    <input type="text" id="player-name" placeholder="Ismingizni yozing...">
-    <input type="text" id="player-id-input" placeholder="ID raqamingiz (Yangi kirayotganlar bo'sh qoldirsin)...">
+    <p>Akkaunt ma'lumotlari:</p>
+    <input type="text" id="player-name" placeholder="Ismingizni yozing (ixtiyoriy)...">
+    <input type="text" id="player-id-input" placeholder="ID raqam (avtomatik yuklanadi)...">
     <button onclick="login()">Oʻyinga kirish</button>
     
     <hr style="border-color: #3a506b; margin: 20px 0;">
@@ -46,6 +47,7 @@
     </div>
 </div>
 
+<!-- 👑 KASSA PANEL -->
 <div class="box hidden admin-box" id="admin-screen">
     <h2>👑 ASOSIY KASSA PANEL</h2>
     <div style="background: #064e3b; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
@@ -54,7 +56,7 @@
     </div>
     
     <hr style="border-color: #4b5563;">
-    <h3>👥 Oʻyinchilarni qidirish va boshqarish</h3>
+    <h3>👥 Oʻyinchilarni qidirish</h3>
     <input type="text" id="admin-search" class="search-input" placeholder="Ism yoki ID bo'yicha tezkor qidirish..." oninput="filterPlayers()">
     
     <div class="player-list-admin" id="admin-players-container"></div>
@@ -72,9 +74,10 @@
     <button style="background: #ef4444; color: white; margin-top: 20px;" onclick="location.reload()">Chiqish</button>
 </div>
 
+<!-- 👤 O'YINCHI INTERFEYSI -->
 <div class="box hidden" id="game-screen">
     <div style="text-align: left;">
-        <div class="id-badge" id="user-id-display">Sizning ID raqamingiz: ----</div>
+        <div class="id-badge" id="user-id-display">ID raqamingiz: ----</div>
     </div>
     <div class="online-badge">Onlayn oʻyinchilar: <span id="online-users">0</span> ta</div>
     
@@ -92,6 +95,7 @@
             <option value="1000000">1 000 000 soʻm</option>
         </select>
         <button id="find-btn" style="background: #22c55e; color:white;" onclick="findOpponent()">Raqib qidirish</button>
+        <button style="background: #ef4444; color: white; margin-top: 15px; font-size: 0.9rem; padding: 8px;" onclick="clearMyAccount()">Akkauntdan chiqish (ID ni o'chirish)</button>
     </div>
 
     <div id="play-area" class="hidden">
@@ -108,6 +112,18 @@
     let allPlayersData = []; 
     let visualTimerInterval = null;
 
+    // Sahifa yuklanganda telefonda eski saqlangan ID bormi, tekshiramiz
+    window.onload = function() {
+        const savedId = localStorage.getItem('oshq_player_id');
+        const savedName = localStorage.getItem('oshq_player_name');
+        if (savedId) {
+            document.getElementById('player-id-input').value = savedId;
+            if (savedName) document.getElementById('player-name').value = savedName;
+            // Avtomatik silliq kirish
+            socket.emit('register_player', { id: savedId, name: savedName || "" });
+        }
+    }
+
     function login() {
         const name = document.getElementById('player-name').value.trim();
         const existingId = document.getElementById('player-id-input').value.trim();
@@ -115,12 +131,24 @@
     }
 
     socket.on('register_success', (data) => {
+        // ID va Ismni telefonga umrbod saqlab qo'yamiz
+        localStorage.setItem('oshq_player_id', data.id);
+        localStorage.setItem('oshq_player_name', data.name);
+
         document.getElementById('login-screen').classList.add('hidden');
         document.getElementById('game-screen').classList.remove('hidden');
         document.getElementById('hello-text').innerText = "👤 " + data.name;
         document.getElementById('user-id-display').innerText = "Sizning IDingiz: " + data.id;
         document.getElementById('user-bal').innerText = data.balance.toLocaleString();
     });
+
+    function clearMyAccount() {
+        if(confirm("Haqiqatdan ham bu qurilmadan akkauntingizni uzmoqchimisiz? (ID o'chmaydi, faqat telefondan o'chadi)")) {
+            localStorage.removeItem('oshq_player_id');
+            localStorage.removeItem('oshq_player_name');
+            location.reload();
+        }
+    }
 
     socket.on('online_count', (count) => {
         document.getElementById('online-users').innerText = count;
@@ -201,7 +229,7 @@
         socket.emit('find_opponent', bet);
         document.getElementById('setup-area').classList.add('hidden');
         document.getElementById('play-area').classList.remove('hidden');
-        document.getElementById('timer-area').classList.add('hidden'); // Qidiruvda vaqt ko'rinmaydi
+        document.getElementById('timer-area').classList.add('hidden'); 
     }
 
     socket.on('waiting_mode', (msg) => {
@@ -214,7 +242,6 @@
         document.getElementById('roll-btn').disabled = false;
         document.getElementById('timer-area').classList.remove('hidden');
         
-        // ⏰ Ekrandagi vizual taymer
         let timeLeft = 15;
         document.getElementById('countdown-sec').innerText = timeLeft;
         if(visualTimerInterval) clearInterval(visualTimerInterval);
@@ -265,4 +292,4 @@
     });
 </script>
 </body>
-</html>
+    </html>
