@@ -11,15 +11,17 @@ const io = new Server(server, { cors: { origin: "*" } });
 const DB_FILE = path.join(__dirname, 'database.json');
 
 let dbData = {
-    players: {},
-    nextPlayerId: 1001,
+    players: {}, // O'yinchilar bazasi
+    usedIds: [], // Band bo'lgan 6 xonali ID'lar ro'yxati
     companyProfit: 0
 };
 
+// Bazani yuklash
 if (fs.existsSync(DB_FILE)) {
     try {
         const fileContent = fs.readFileSync(DB_FILE, 'utf8');
         dbData = JSON.parse(fileContent);
+        if (!dbData.usedIds) dbData.usedIds = Object.keys(dbData.players);
     } catch (e) {
         console.log("Baza faylini o'qishda xato, yangi ochiladi.");
     }
@@ -29,11 +31,21 @@ function saveToDatabase() {
     fs.writeFileSync(DB_FILE, JSON.stringify(dbData, null, 2), 'utf8');
 }
 
+// 6 xonali takrorlanmas ID yaratish funksiyasi
+function generateUniqueId() {
+    let id;
+    do {
+        id = Math.floor(100000 + Math.random() * 900000).toString(); // 100000 dan 999999 gacha
+    } while (dbData.usedIds.includes(id));
+    dbData.usedIds.push(id);
+    return id;
+}
+
 let onlineSockets = {}; 
 let waitingLobby = []; 
 let activeRooms = {};
 
-const ADMIN_PASSWORD = "izzatbek2006"; 
+const ADMIN_PASSWORD = "0613"; // 🔥 Admin paroli o'zgartirildi!
 const OSHIQ_SIDES = ["Oʻng", "Chap", "Tik oʻng", "Tik chap"];
 
 function getAdminPlayersList() {
@@ -50,6 +62,7 @@ app.get('/', (req, res) => {
 
 io.on('connection', (socket) => {
 
+    // --- ADMIN PANEL ---
     socket.on('admin_login', (pass) => {
         if(pass === ADMIN_PASSWORD) {
             socket.emit('admin_auth_success', {
@@ -85,33 +98,46 @@ io.on('connection', (socket) => {
         socket.emit('admin_action_success', `Muvaffaqiyatli bajarildi! Yangi balans: ${player.balance.toLocaleString()} so'm`);
     });
 
+    // --- AKKAUNT RO'YXATDAN O'TISH VA KIRISH (AVTOMATIK TIZIM) ---
     socket.on('register_player', (data) => {
         let player;
-        
+
+        // 1. Agar foydalanuvchi tizimga qayta kirayotgan bo'lsa (ID va Parol bilan)
         if (data.id && dbData.players[data.id]) {
-            player = dbData.players[data.id];
-            if (data.name && data.name.trim() !== "") {
-                player.name = data.name;
+            let existingPlayer = dbData.players[data.id];
+
+            // Parolni tekshirish
+            if (existingPlayer.password !== data.password) {
+                return socket.emit('error_msg', 'Xato ID yoki Parol kiritildi!');
             }
-        } else {
+            player = existingPlayer;
+        } 
+        // 2. Agar foydalanuvchi birinchi marta kirayotgan bo'lsa (Yangi akkaunt)
+        else {
             if (!data.name || data.name.trim() === "") {
                 return socket.emit('error_msg', 'Iltimos, ismingizni kiriting!');
             }
-            let newId = dbData.nextPlayerId++;
+            if (!data.password || data.password.toString().length !== 4) {
+                return socket.emit('error_msg', 'Parol aniq 4 ta raqamdan iborat boʻlishi shart!');
+            }
+
+            let newId = generateUniqueId(); // 6 xonali ID yaratish
+            
             player = {
                 id: newId,
-                name: data.name,
+                name: data.name.trim(),
+                password: data.password.toString(), // 4 xonali parol
                 balance: 0, 
                 status: "idle"
             };
             dbData.players[newId] = player;
+            saveToDatabase();
         }
-
-        saveToDatabase();
 
         onlineSockets[socket.id] = player.id;
         player.status = "idle";
 
+        // Muvaffaqiyatli kirganda ma'lumotlarni telefonga qaytarish
         socket.emit('register_success', {
             id: player.id,
             name: player.name,
@@ -122,6 +148,7 @@ io.on('connection', (socket) => {
         io.to('admin_room').emit('admin_players_update', getAdminPlayersList());
     });
 
+    // --- RAQIB QIDIRISH ---
     socket.on('find_opponent', (betAmount) => {
         const pId = onlineSockets[socket.id];
         const player = dbData.players[pId];
@@ -129,13 +156,12 @@ io.on('connection', (socket) => {
 
         const bet = parseInt(betAmount);
         
-        // 🔥 BOTLAR UCHUN CHEKSIZ BALANS SHARTI
-        if (player.id === 8881 || player.id === 8882 || player.id === 8883) {
+        // Botlar uchun cheksiz balans (Ismida 'Bot' so'zi bo'lsa)
+        if (player.name && player.name.includes("Bot")) {
             player.balance = 1000000; 
         } else {
-            // Haqiqiy o'yinchilar balansi tekshiriladi
             if (player.balance < bet) {
-                return socket.emit('error_msg', 'Mablagʻingiz yetarli emas! Iltimos, kassirga murojaat qiling.');
+                return socket.emit('error_msg', 'Mablagʻingiz yetarli emas! Kassirga murojaat qiling.');
             }
         }
 
@@ -181,6 +207,7 @@ io.on('connection', (socket) => {
         }
     });
 
+    // --- TOSHLARNI TASHALASH ---
     socket.on('roll_dice', (roomId) => {
         const room = activeRooms[roomId];
         if (!room) return;
@@ -318,7 +345,7 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log('OSHQ OʻYIN serveri yangilandi.');
     
-    // 🔥 SERVER ISHGA TUSHGANDAN KEYIN BOTLARNI HAM UYG'OTAMIZ
+    // Botlarni server ichida avtomat yoqish
     try {
         if (fs.existsSync(path.join(__dirname, 'bots.js'))) {
             require('./bots.js');
