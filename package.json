@@ -1,12 +1,19 @@
 {
-  "name": "shashqol-o-yini",
+  "name": "shashqol-o-yin",
   "version": "1.0.0",
+  "description": "Shashqol (Oshiq) o'yini va avtomatlashtirilgan botlar tizimi",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "bots": "node bots.js",
+    "dev": "npx concurrently \"node server.js\" \"node bots.js\""
   },
   "dependencies": {
-    "express": "^4.19.2",
-    "socket.io": "^4.7.5"
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2",
+    "socket.io-client": "^4.7.2"
+  },
+  "engines": {
+    "node": ">=14.0.0"
   }
 }
