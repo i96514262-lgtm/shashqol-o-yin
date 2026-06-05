@@ -7,42 +7,50 @@
     <script src="/socket.io/socket.io.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
-        body { background-color: #0f172a; color: #f8fafc; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+        body { background-color: #0f172a; color: #f8fafc; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 15px; }
         .container { width: 100%; max-width: 440px; background: #1e293b; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 2px solid #334155; text-align: center; }
-        h1 { color: #38bdf8; margin-bottom: 20px; font-size: 24px; text-transform: uppercase; }
+        h1 { color: #38bdf8; margin-bottom: 5px; font-size: 22px; text-transform: uppercase; letter-spacing: 1px; }
+        .online-badge { background: #059669; color: white; padding: 5px 12px; font-size: 13px; font-weight: bold; border-radius: 20px; display: inline-block; margin-bottom: 20px; }
         .input-group { margin-bottom: 15px; text-align: left; }
-        label { display: block; margin-bottom: 5px; color: #94a3b8; font-size: 14px; }
-        input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #fff; font-size: 16px; outline: none; }
-        button { width: 100%; padding: 12px; background: #0ea5e9; border: none; color: #fff; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; }
+        label { display: block; margin-bottom: 6px; color: #94a3b8; font-size: 14px; font-weight: 500; }
+        input, select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #fff; font-size: 16px; outline: none; }
+        button { width: 100%; padding: 14px; background: #0ea5e9; border: none; color: #fff; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 5px; }
         .profile-card { background: #0f172a; padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #334155; text-align: left; }
-        .profile-card p { margin-bottom: 8px; font-size: 16px; }
+        .profile-card p { margin-bottom: 8px; font-size: 15px; }
         .profile-card span { font-weight: bold; color: #38bdf8; }
-        .status-box { background: #334155; padding: 15px; border-radius: 8px; margin-top: 15px; font-weight: bold; font-size: 16px; }
+        .status-box { background: #334155; padding: 15px; border-radius: 8px; margin-top: 15px; font-weight: bold; font-size: 16px; line-height: 1.4; }
         .screen { display: none; }
         .active { display: block; }
         .toggle-text { color: #38bdf8; font-size: 14px; margin-top: 15px; cursor: pointer; text-decoration: underline; }
         
-        /* ADMIN PANEL */
+        /* ADMIN PANEL ELEMENTLARI */
         .admin-box { background: #111827; border: 2px solid #22c55e; border-radius: 12px; padding: 20px; text-align: left; }
-        .profit-box { background: #065f46; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px; font-size: 18px; color: #34d399; font-weight: bold; }
-        .player-item { background: #1f2937; padding: 12px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #374151; }
-        .btn-manage { width: auto; padding: 6px 12px; font-size: 14px; background: #22c55e; margin: 0; }
+        .profit-box { background: #065f46; padding: 12px; border-radius: 8px; text-align: center; margin-bottom: 15px; font-size: 16px; color: #34d399; font-weight: bold; }
+        .search-box { width: 100%; padding: 10px; margin-bottom: 15px; background: #1f2937; border: 1px solid #374151; border-radius: 6px; color: white; }
+        .game-section { background: #1e293b; border: 1px dashed #38bdf8; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
+        .game-item { font-size: 13px; padding: 5px 0; border-bottom: 1px solid #334155; color: #cbd5e1; }
+        .player-item { background: #1f2937; padding: 12px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #374151; }
+        .badge-status { font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+        .status-idle { background: #334155; color: #cbd5e1; }
+        .status-searching { background: #9a3412; color: #ffedd5; }
+        .status-playing { background: #166534; color: #dcfce7; }
+        .status-offline { background: #991b1b; color: #fee2e2; }
+        .btn-manage { width: auto; padding: 8px 14px; font-size: 14px; background: #22c55e; border-radius: 6px; margin: 0; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1 id="main-title">🎲 OSHQ OʻYIN</h1>
+    <h1>🎲 OSHQ OʻYIN</h1>
+    <div class="online-badge">🟢 Onlayn: <span id="global-online-count">0</span> ta oʻyinchi</div>
 
-    <!-- 1. LOGIN / KIRISH EKRANI (FAQAT PAROL BILAN) -->
     <div id="login-screen" class="screen active">
-        <p style="color: #94a3b8; margin-bottom: 15px; font-size: 14px;">Akkauntingiz bo'lsa, ID va 4 xonali parolingizni yozib kiring:</p>
         <div class="input-group">
             <label>6 xonali ID raqamingiz:</label>
-            <input type="number" id="login-id-input" placeholder="Masalan: 100005">
+            <input type="number" id="login-id-input" placeholder="Masalan: 100003">
         </div>
         <div class="input-group">
-            <label>4 xonali parolingiz:</label>
+            <label>4 xonali maxfiy parolingiz:</label>
             <input type="number" id="login-pass-input" placeholder="Parol" oninput="if(this.value.length>4) this.value=this.value.slice(0,4);">
         </div>
         <button style="background: #22c55e;" onclick="handleLogin()">Akkauntga Kirish</button>
@@ -50,77 +58,88 @@
         <p class="toggle-text" style="color: #64748b;" onclick="openAdmin()">👑 Kassa panelga kirish</p>
     </div>
 
-    <!-- 2. REGISTRATSIYA EKRANI (BIRINCHI MARTA KIRAYOTGANLAR UCHUN) -->
     <div id="register-screen" class="screen">
-        <p style="color: #94a3b8; margin-bottom: 15px; font-size: 14px;">Yangi profil yarating. ID raqam avtomatik beriladi!</p>
         <div class="input-group">
             <label>Ismingiz (Keyinchalik o'zgartirib bo'lmaydi):</label>
-            <input type="text" id="reg-name-input" placeholder="Ismingizni yozing...">
+            <input type="text" id="reg-name-input" placeholder="Ismingizni yozing">
         </div>
         <div class="input-group">
-            <label>4 xonali maxfiy parol kiriting:</label>
-            <input type="number" id="reg-pass-input" placeholder="Masalan: 7788" oninput="if(this.value.length>4) this.value=this.value.slice(0,4);">
+            <label>4 xonali maxfiy parol o'ylab toping:</label>
+            <input type="number" id="reg-pass-input" placeholder="Masalan: 5566" oninput="if(this.value.length>4) this.value=this.value.slice(0,4);">
         </div>
         <button onclick="handleRegister()">ID Raqam olish va O'yinga kirish</button>
-        <p class="toggle-text" onclick="switchScreen('login-screen')">⬅️ Orqaga (Eski akkauntga kirish)</p>
+        <p class="toggle-text" onclick="switchScreen('login-screen')">⬅️ Orqaga (Kiritish ekraniga qaytish)</p>
     </div>
 
-    <!-- 3. ASOSIY O'YIN PANELI -->
     <div id="main-game-screen" class="screen">
         <div class="profile-card">
-            <p>Foydalanuvchi: <span id="display-name">...</span></p>
-            <p>ID raqamingiz: <span id="display-id" style="color: #eab308;">...</span></p>
+            <p>Oʻyinchi: <span id="display-name">...</span></p>
+            <p>Sizning ID: <span id="display-id" style="color: #eab308;">...</span></p>
             <p>Balansingiz: <span id="display-balance" style="color: #22c55e;">0 so'm</span></p>
         </div>
 
         <div class="input-group" id="bet-area">
-            <label>Oʻyin tikish summasi (soʻm):</label>
-            <input type="number" id="bet-input" value="1000">
+            <label>Oʻyin tikish summasini tanlang (soʻm):</label>
+            <select id="bet-input">
+                <option value="50000">50,000 so'm</option>
+                <option value="100000">100,000 so'm</option>
+                <option value="300000">300,000 so'm</option>
+                <option value="700000">70,000 so'm</option>
+                <option value="1000000" selected>1,000,000 so'm</option>
+            </select>
             <button onclick="startSearch()">Raqib qidirish</button>
         </div>
 
         <div id="game-status" class="status-box" style="display: none;">Raqib qidirilmoqda...</div>
-        <button id="roll-btn" style="display: none; background: #22c55e;" onclick="rollDice()">Toshlarni tashlash! 🎲</button>
-        <button style="background: #475569; margin-top: 20px; font-size:14px; padding: 8px;" onclick="location.reload()">Akkauntdan chiqish</button>
+        <button id="roll-btn" style="display: none; background: #22c55e; margin-top: 15px;" onclick="rollDice()">Toshlarni tashlash! 🎲</button>
+        <button style="background: #475569; margin-top: 25px; font-size:13px; padding: 8px;" onclick="location.reload()">Akkauntdan chiqish</button>
     </div>
 
-    <!-- 4. ADMIN PANEL (KASSA) -->
     <div id="admin-panel-screen" class="screen admin-box">
         <div class="profit-box">
-            💰 Kassadagi jami 3% Soliq foydasi:<br>
-            <span id="admin-profit">0 so'm</span>
+            💰 Jami 3% Soliq foydasi: <span id="admin-profit">0 so'm</span>
         </div>
-        <h3 style="color: #38bdf8; margin-bottom: 10px;">👥 Oʻyinchilar balansi</h3>
-        <div id="admin-players-list" style="max-height: 280px; overflow-y: auto;"></div>
-        <button style="background: #ef4444;" onclick="location.reload()">Kassadan chiqish</button>
+        
+        <div class="game-section">
+            <h4 style="color:#38bdf8; font-size:13px; margin-bottom:5px;">⚡ JONLI SHU TOBDA OʻYNAYOTGANLAR:</h4>
+            <div id="admin-active-games"><i>Faol o'yinlar yo'q</i></div>
+        </div>
+
+        <h4 style="color: #38bdf8; margin-bottom: 5px; font-size:13px;">👥 OʻYINCHILARNI QIDIRISH VA BALANSI:</h4>
+        <input type="text" id="admin-search" class="search-box" placeholder="Ism yoki ID bo'yicha tezkor qidirish..." oninput="filterAdminPlayers()">
+        
+        <div id="admin-players-list" style="max-height: 240px; overflow-y: auto;"></div>
+        <button style="background: #ef4444; margin-top:15px;" onclick="location.reload()">Kassadan chiqish</button>
     </div>
 </div>
 
 <script>
     const socket = io();
     let currentRoomId = null;
+    let localPlayersCache = [];
 
-    // 1. ESKI AKKAUNTGA KIRISH
+    socket.on('online_count', (count) => {
+        document.getElementById('global-online-count').textContent = count;
+    });
+
     function handleLogin() {
         const id = document.getElementById('login-id-input').value.trim();
         const pass = document.getElementById('login-pass-input').value.trim();
-        if (!id || !pass) return alert('ID va parolni toʻliq kiriting!');
-        
+        if (!id || !pass) return alert('ID va parolni yozing!');
         socket.emit('register_player', { id: parseInt(id), password: pass });
     }
 
-    // 2. YANGI AKKAUNT OCHISH (AVTOMAT ID OLISH)
     function handleRegister() {
         const name = document.getElementById('reg-name-input').value.trim();
         const pass = document.getElementById('reg-pass-input').value.trim();
-        if (!name) return alert('Ismingizni kiriting!');
-        if (pass.length !== 4) return alert('Parol aniq 4 ta raqam boʻlishi shart!');
-
+        if (!name || pass.length !== 4) return alert('Ism va 4 xonali parolni toʻgʻri yozing!');
         socket.emit('register_player', { name: name, password: pass });
     }
 
-    // KIRISH MUVAFFAQIYATLI BO'LSA
     socket.on('register_success', (playerData) => {
+        if(!document.getElementById('display-id').textContent || document.getElementById('display-id').textContent === "...") {
+            alert(`Sizning bir umrlik ID raqamingiz: ${playerData.id}\nUni eslab qoling!`);
+        }
         document.getElementById('display-name').textContent = playerData.name;
         document.getElementById('display-id').textContent = playerData.id;
         document.getElementById('display-balance').textContent = playerData.balance.toLocaleString() + " so'm";
@@ -131,20 +150,17 @@
         document.getElementById('display-balance').textContent = newBalance.toLocaleString() + " so'm";
     });
 
-    // RAQIB QIDIRISH VA O'YIN
     function startSearch() {
         const bet = document.getElementById('bet-input').value;
-        if (!bet || bet <= 0) return alert('Tikish summasini kiriting!');
         document.getElementById('bet-area').style.display = 'none';
-        const sb = document.getElementById('game-status');
-        sb.style.display = 'block';
-        sb.textContent = "Raqib qidirilmoqda...";
+        document.getElementById('game-status').style.display = 'block';
+        document.getElementById('game-status').textContent = "Raqib qidirilmoqda...";
         socket.emit('find_opponent', bet);
     }
 
     socket.on('game_start', (data) => {
         currentRoomId = data.roomId;
-        document.getElementById('game-status').innerHTML = `Oʻyin boshlandi!<br><span style="color:#38bdf8">${data.p1}</span> VS <span style="color:#ef4444">${data.p2}</span><br>Tikilgan pul: ${data.bet.toLocaleString()} so'm`;
+        document.getElementById('game-status').innerHTML = `Oʻyin boshlandi!<br><span style="color:#38bdf8">${data.p1}</span> VS <span style="color:#f43f5e">${data.p2}</span><br>Tikilgan pul: ${data.bet.toLocaleString()} so'm`;
         document.getElementById('roll-btn').style.display = 'block';
     });
 
@@ -152,47 +168,87 @@
         if (!currentRoomId) return;
         socket.emit('roll_dice', currentRoomId);
         document.getElementById('roll-btn').style.display = 'none';
-        document.getElementById('game-status').textContent = "Siz tosh tashladingiz. Kutilmoqda...";
+        document.getElementById('game-status').textContent = "Siz tosh tashladingiz. Raqib kutilyapti...";
     }
+
+    socket.on('game_timeout', (msg) => {
+        document.getElementById('roll-btn').style.display = 'none';
+        document.getElementById('game-status').textContent = msg;
+    });
+
+    socket.on('auto_reseek', (oldBet) => {
+        setTimeout(() => {
+            document.getElementById('game-status').textContent = "Yangi faol raqib qidirilmoqda...";
+            socket.emit('find_opponent', oldBet);
+        }, 2000);
+    });
 
     socket.on('game_over', (data) => {
         currentRoomId = null;
         document.getElementById('roll-btn').style.display = 'none';
         const sb = document.getElementById('game-status');
-        sb.innerHTML = `🏆 OʻYIN TUGADI!<br><br><span style="color:#22c55e; font-size:18px;">Natija: ${data.result}</span>`;
+        sb.innerHTML = `🏆 OʻYIN TUGADI!<br><br><span style="color:#22c55e; font-size:16px;">Natija: ${data.result}</span>`;
         setTimeout(() => {
             sb.style.display = 'none';
             document.getElementById('bet-area').style.display = 'block';
-        }, 6000);
+        }, 5000);
     });
 
-    // KASSA PANEL (ADMIN)
+    // ADMIN FILTR VA INTEGRATSIYA
     function openAdmin() {
-        const pass = prompt('Admin parolini kiriting:');
+        const pass = prompt('Admin maxfiy kodini kiriting:');
         if(pass) socket.emit('admin_login', pass);
     }
 
     socket.on('admin_auth_success', (data) => {
         document.getElementById('main-title').textContent = "KASSA PANEL";
         document.getElementById('admin-profit').textContent = data.profit.toLocaleString() + " so'm";
-        renderAdminPlayers(data.players);
+        localPlayersCache = data.players;
+        renderAdminList(data.players, data.activeGames);
         switchScreen('admin-panel-screen');
     });
 
-    socket.on('admin_players_update', (players) => { renderAdminPlayers(players); });
-    socket.on('update_profit', (profit) => { document.getElementById('admin-profit').textContent = profit.toLocaleString() + " so'm"; });
+    socket.on('admin_players_update', (data) => {
+        localPlayersCache = data.players;
+        renderAdminList(data.players, data.activeGames);
+    });
 
-    function renderAdminPlayers(players) {
+    function renderAdminList(players, activeGames) {
+        // Jonli o'yinlarni chizish
+        const gamesContainer = document.getElementById('admin-active-games');
+        if(!activeGames || activeGames.length === 0) {
+            gamesContainer.innerHTML = "<i>O'yin o'ynalayotgan xonalar hozircha yo'q</i>";
+        } else {
+            gamesContainer.innerHTML = "";
+            activeGames.forEach(g => {
+                const div = document.createElement('div');
+                div.className = 'game-item';
+                div.innerHTML = `⚔️ <strong>${g.p1}</strong> VS <strong>${g.p2}</strong> | Tikilgan pul: <span style="color:#eab308">${g.bet.toLocaleString()} so'm</span>`;
+                gamesContainer.appendChild(div);
+            });
+        }
+        filterAdminPlayers(); 
+    }
+
+    // Admin oson qidirishi uchun qidiruv filtri funksiyasi
+    function filterAdminPlayers() {
+        const query = document.getElementById('admin-search').value.toLowerCase();
         const listContainer = document.getElementById('admin-players-list');
         listContainer.innerHTML = "";
-        players.forEach(p => {
+
+        const filtered = localPlayersCache.filter(p => p.id.toString().includes(query) || p.name.toLowerCase().includes(query));
+
+        filtered.forEach(p => {
+            let statusText = p.status === "idle" ? "Boʻsh" : p.status === "searching" ? "Qidiruvda" : p.status === "playing" ? "Oʻyinda" : "Oflyayn";
+            let statusClass = "status-" + p.status;
+            
             const item = document.createElement('div');
             item.className = 'player-item';
             item.innerHTML = `
                 <div>
-                    <small style="color:#94a3b8">ID: ${p.id}</small><br>
+                    <small style="color:#94a3b8">ID: ${p.id}</small> <span class="badge-status ${statusClass}">${statusText}</span><br>
                     <strong>${p.name}</strong><br>
-                    <span style="color:#22c55e">${p.balance.toLocaleString()} so'm</span>
+                    <span style="color:#22c55e; font-weight:bold;">${p.balance.toLocaleString()} so'm</span>
                 </div>
                 <button class="btn-manage" onclick="managePlayerBalance('${p.id}', '${p.name}')">Boshqarish</button>
             `;
@@ -201,17 +257,14 @@
     }
 
     function managePlayerBalance(id, name) {
-        const amountStr = prompt(`${name} (ID: ${id}) uchun summani yozing:`);
+        const amountStr = prompt(`${name} (ID: ${id}) uchun summani kiriting:`);
         if (!amountStr) return;
         const amount = parseInt(amountStr);
-        if (isNaN(amount) || amount <= 0) return alert('Xato summa!');
+        if (isNaN(amount) || amount <= 0) return alert('Notoʻgʻri summa!');
 
-        const action = prompt(`Pul qo'shish uchun: +\nPul yechish uchun: -`);
-        if (action === '+') {
-            socket.emit('admin_modify_balance', { id: id, amount: amount, type: 'plus' });
-        } else if (action === '-') {
-            socket.emit('admin_modify_balance', { id: id, amount: amount, type: 'minus' });
-        }
+        const action = prompt(`Pul qo'shish uchun: +\nPul ayirish uchun: -`);
+        if (action === '+') socket.emit('admin_modify_balance', { id: id, amount: amount, type: 'plus' });
+        if (action === '-') socket.emit('admin_modify_balance', { id: id, amount: amount, type: 'minus' });
     }
 
     socket.on('error_msg', (msg) => { alert(msg); });
@@ -222,4 +275,4 @@
     }
 </script>
 </body>
-    </html>
+</html>
