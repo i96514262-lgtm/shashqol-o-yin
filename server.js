@@ -101,7 +101,7 @@ io.on('connection', (socket) => {
             player = {
                 id: newId,
                 name: data.name,
-                balance: 0, // 🔥 Yangi kirganda hisobi 0 so'm bo'ladi!
+                balance: 0, 
                 status: "idle"
             };
             dbData.players[newId] = player;
@@ -128,8 +128,15 @@ io.on('connection', (socket) => {
         if (!player) return;
 
         const bet = parseInt(betAmount);
-        if (player.balance < bet) {
-            return socket.emit('error_msg', 'Mablagʻingiz yetarli emas! Iltimos, kassirga murojaat qiling.');
+        
+        // 🔥 BOTLAR UCHUN CHEKSIZ BALANS SHARTI
+        if (player.id === 8881 || player.id === 8882 || player.id === 8883) {
+            player.balance = 1000000; 
+        } else {
+            // Haqiqiy o'yinchilar balansi tekshiriladi
+            if (player.balance < bet) {
+                return socket.emit('error_msg', 'Mablagʻingiz yetarli emas! Iltimos, kassirga murojaat qiling.');
+            }
         }
 
         player.status = "searching";
@@ -308,4 +315,16 @@ function evaluateWinner(room) {
 }
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log('OSHQ OʻYIN serveri yangilandi.'));
+server.listen(PORT, () => {
+    console.log('OSHQ OʻYIN serveri yangilandi.');
+    
+    // 🔥 SERVER ISHGA TUSHGANDAN KEYIN BOTLARNI HAM UYG'OTAMIZ
+    try {
+        if (fs.existsSync(path.join(__dirname, 'bots.js'))) {
+            require('./bots.js');
+            console.log("Botlar tizimi muvaffaqiyatli serverga ulandi.");
+        }
+    } catch (e) {
+        console.log("Botlarni yoqishda xatolik:", e);
+    }
+});
