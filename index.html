@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OSHQ OʻYIN — Shashqol</title>
+    <title>OSHQ OʻYIN — Tizim</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background-color: #0f172a; color: #f8fafc; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
-        .container { width: 100%; max-width: 450px; background: #1e293b; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 2px solid #334155; text-align: center; }
+        .container { width: 100%; max-width: 480px; background: #1e293b; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 2px solid #334155; text-align: center; }
         h1 { color: #38bdf8; margin-bottom: 20px; font-size: 24px; text-transform: uppercase; letter-spacing: 1px; }
         .input-group { margin-bottom: 15px; text-align: left; }
         label { display: block; margin-bottom: 5px; color: #94a3b8; font-size: 14px; }
@@ -20,32 +20,38 @@
         .profile-card p { margin-bottom: 8px; font-size: 16px; }
         .profile-card span { font-weight: bold; color: #38bdf8; }
         .status-box { background: #334155; padding: 15px; border-radius: 8px; margin-top: 15px; font-weight: bold; font-size: 16px; color: #e2e8f0; }
-        .lobby-box { display: flex; gap: 10px; margin-top: 15px; }
         .screen { display: none; }
         .active { display: block; }
-        .error { color: #ef4444; font-size: 14px; margin-top: 5px; display: none; }
+        
+        /* ADMIN PANEL STYLES */
+        .admin-box { background: #111827; border: 2px solid #22c55e; border-radius: 12px; padding: 20px; text-align: left; }
+        .profit-box { background: #065f46; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px; font-size: 18px; font-weight: bold; color: #34d399; }
+        .player-item { background: #1f2937; padding: 12px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #374151; }
+        .btn-manage { width: auto; padding: 6px 12px; font-size: 14px; background: #22c55e; margin: 0; }
+        .admin-nav { margin-top: 15px; font-size: 13px; color: #64748b; cursor: pointer; text-decoration: underline; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>🎲 OSHQ OʻYIN</h1>
+    <h1 id="game-title">🎲 OSHQ OʻYIN</h1>
 
     <div id="loading-screen" class="screen active">
-        <p style="color: #94a3b8; font-size: 16px;">Tizim tekshirilmoqda, iltimos kuting...</p>
+        <p style="color: #94a3b8; font-size: 16px;">Tizim tekshirilmoqda, kuting...</p>
     </div>
 
     <div id="auth-screen" class="screen">
-        <p style="color: #94a3b8; margin-bottom: 15px; font-size: 14px;">Tizimda akkauntingiz topilmadi. Yangi profil yarating:</p>
+        <p style="color: #94a3b8; margin-bottom: 15px; font-size: 14px;">Akkaunt topilmadi. Yangi profil yarating:</p>
         <div class="input-group">
             <label>Ismingiz:</label>
             <input type="text" id="name-input" placeholder="Ismingizni kiriting...">
         </div>
         <div class="input-group">
-            <label>4 xonali maxfiy parol (Akkauntni himoyalash uchun):</label>
+            <label>4 xonali maxfiy parol:</label>
             <input type="number" id="password-input" placeholder="Masalan: 1234" oninput="if(this.value.length>4) this.value=this.value.slice(0,4);">
         </div>
         <button onclick="handleRegister()">Akkaunt yaratish va Kirish</button>
+        <p class="admin-nav" onclick="openAdminLogin()">👑 Admin panelga kirish</p>
     </div>
 
     <div id="main-game-screen" class="screen">
@@ -62,8 +68,31 @@
         </div>
 
         <div id="game-status" class="status-box" style="display: none;">Raqib qidirilmoqda...</div>
-        
         <button id="roll-btn" style="display: none; background: #22c55e;" onclick="rollDice()">Toshlarni tashlash! 🎲</button>
+        <p class="admin-nav" onclick="location.reload()">🔄 Chiqish / Akkauntni almashtirish</p>
+    </div>
+
+    <div id="admin-login-screen" class="screen">
+        <h2>👑 ASOSIY KASSA KIRISh</h2>
+        <div class="input-group" style="margin-top: 15px;">
+            <label>Admin parolini kiriting:</label>
+            <input type="password" id="admin-pass-input" placeholder="Parol...">
+        </div>
+        <button style="background: #22c55e;" onclick="submitAdminLogin()">Kirish</button>
+        <p class="admin-nav" onclick="switchScreen('auth-screen')">⬅️ Orqaga qaytish</p>
+    </div>
+
+    <div id="admin-panel-screen" class="screen admin-box">
+        <div class="profit-box">
+            💰 Kassadagi jami 3% Soliq foydasi:<br>
+            <span id="admin-profit">0 so'm</span>
+        </div>
+        
+        <h3 style="color: #38bdf8; margin-bottom: 10px;">👥 Oʻyinchilarni qidirish (va Botlar)</h3>
+        <div id="admin-players-list" style="max-height: 25px0px; overflow-y: auto; margin-bottom: 15px;">
+            </div>
+        
+        <button style="background: #ef4444;" onclick="location.reload()">Chiqish</button>
     </div>
 </div>
 
@@ -71,144 +100,146 @@
     const socket = io();
     let currentRoomId = null;
 
-    // Sayt yuklanishi bilan xotirani tekshirish va login qilish
+    // Yuklanganda avtomat tekshirish
     window.addEventListener('DOMContentLoaded', () => {
         const savedId = localStorage.getItem('shashqol_user_id');
         const savedPassword = localStorage.getItem('shashqol_user_password');
 
         if (savedId && savedPassword) {
-            // Agar telefonda eski ma'lumot bo'lsa, avtomat kirgizamiz
-            socket.emit('register_player', {
-                id: savedId,
-                password: savedPassword
-            });
+            socket.emit('register_player', { id: savedId, password: savedPassword });
         } else {
-            // Agar toza bo'lsa, registratsiya oynasini ochamiz
             switchScreen('auth-screen');
         }
     });
 
-    // Yangi ro'yxatdan o'tish tugmasi bosilganda
     function handleRegister() {
         const name = document.getElementById('name-input').value.trim();
         const password = document.getElementById('password-input').value.trim();
-
-        if (!name) return alert('Iltimos, ismingizni kiriting!');
-        if (password.length !== 4) return alert('Parol aniq 4 ta raqam boʻlishi shart!');
-
-        // Parolni muvaffaqiyatli javob kelganda saqlash uchun vaqtincha saqlaymiz
+        if (!name) return alert('Ismingizni kiriting!');
+        if (password.length !== 4) return alert('Parol 4 xonali boʻlsin!');
         window.temp_password = password;
-
-        socket.emit('register_player', {
-            name: name,
-            password: password
-        });
+        socket.emit('register_player', { name: name, password: password });
     }
 
-    // Serverdan muvaffaqiyatli kirish javobi kelganda
     socket.on('register_success', (playerData) => {
-        // Ma'lumotlarni telefon xotirasiga qulflaymiz
         localStorage.setItem('shashqol_user_id', playerData.id);
         if (window.temp_password) {
             localStorage.setItem('shashqol_user_password', window.temp_password);
             delete window.temp_password;
         }
-
-        // Ekrandagi ma'lumotlarni yangilash
         document.getElementById('display-name').textContent = playerData.name;
         document.getElementById('display-id').textContent = playerData.id;
         document.getElementById('display-balance').textContent = playerData.balance.toLocaleString() + " so'm";
-
         switchScreen('main-game-screen');
     });
 
-    // Balans yangilanganda (yutuq yoki yutqiziqdan keyin)
     socket.on('balance_updated', (newBalance) => {
         document.getElementById('display-balance').textContent = newBalance.toLocaleString() + " so'm";
     });
 
-    // Raqib qidirishni boshlash
     function startSearch() {
         const bet = document.getElementById('bet-input').value;
-        if (!bet || bet <= 0) return alert('Tikish summasini toʻgʻri kiriting!');
-        
+        if (!bet || bet <= 0) return alert('Tikish summasini kiriting!');
         document.getElementById('bet-area').style.display = 'none';
-        const statusBox = document.getElementById('game-status');
-        statusBox.style.display = 'block';
-        statusBox.textContent = "Raqib qidirilmoqda, kuting...";
-        
+        const sb = document.getElementById('game-status');
+        sb.style.display = 'block';
+        sb.textContent = "Raqib qidirilmoqda...";
         socket.emit('find_opponent', bet);
     }
 
-    // Kutish rejimi xabari
-    socket.on('waiting_mode', (msg) => {
-        document.getElementById('game-status').textContent = msg;
-    });
+    socket.on('waiting_mode', (msg) => { document.getElementById('game-status').textContent = msg; });
 
-    // O'yin boshlanganda
     socket.on('game_start', (data) => {
         currentRoomId = data.roomId;
-        const statusBox = document.getElementById('game-status');
-        statusBox.innerHTML = `Oʻyin boshlandi!<br><span style="color:#38bdf8">${data.p1}</span> VS <span style="color:#ef4444">${data.p2}</span><br>Tikilgan pul: ${data.bet.toLocaleString()} so'm`;
-        
+        document.getElementById('game-status').innerHTML = `Oʻyin boshlandi!<br><span style="color:#38bdf8">${data.p1}</span> VS <span style="color:#ef4444">${data.p2}</span><br>Tikilgan pul: ${data.bet.toLocaleString()} so'm`;
         document.getElementById('roll-btn').style.display = 'block';
     });
 
-    // Tosh tashlash tugmasi bosilganda
     function rollDice() {
         if (!currentRoomId) return;
         socket.emit('roll_dice', currentRoomId);
         document.getElementById('roll-btn').style.display = 'none';
-        document.getElementById('game-status').textContent = "Siz tosh tashladingiz. Raqibingiz harakatini kuting...";
+        document.getElementById('game-status').textContent = "Siz tosh tashladingiz. Kutilmoqda...";
     }
 
-    // Raqib tosh tashlaganda
-    socket.on('player_rolled', (data) => {
-        document.getElementById('game-status').innerHTML += `<br>✅ ${data.name} tosh tashladi!`;
-    });
+    socket.on('player_rolled', (data) => { document.getElementById('game-status').innerHTML += `<br>✅ ${data.name} tosh tashladi!`; });
 
-    // O'yin butunlay tugaganda va natija chiqqanda
     socket.on('game_over', (data) => {
         currentRoomId = null;
         document.getElementById('roll-btn').style.display = 'none';
-        
-        const statusBox = document.getElementById('game-status');
-        statusBox.innerHTML = `🏆 OʻYIN TUGADI!<br><br><span style="color:#22c55e; font-size:18px;">Natija: ${data.result}</span>`;
-        
-        // 7 soniyadan keyin eski holatga qaytarish va tikish oynasini ochish
+        const sb = document.getElementById('game-status');
+        sb.innerHTML = `🏆 OʻYIN TUGADI!<br><br><span style="color:#22c55e; font-size:18px;">Natija: ${data.result}</span>`;
         setTimeout(() => {
-            statusBox.style.display = 'none';
+            sb.style.display = 'none';
             document.getElementById('bet-area').style.display = 'block';
         }, 7000);
     });
 
-    // Xatoliklar yuz berganda
+    // ====== ADMIN LOGIKASI VA PUL O'TKAZISH/YECHISH ======
+    function openAdminLogin() { document.getElementById('game-title').textContent = "KASSA"; switchScreen('admin-login-screen'); }
+    
+    function submitAdminLogin() {
+        const pass = document.getElementById('admin-pass-input').value;
+        socket.emit('admin_login', pass);
+    }
+
+    socket.on('admin_auth_success', (data) => {
+        document.getElementById('admin-profit').textContent = data.profit.toLocaleString() + " so'm";
+        renderAdminPlayers(data.players);
+        switchScreen('admin-panel-screen');
+    });
+
+    socket.on('admin_players_update', (players) => { renderAdminPlayers(players); });
+    socket.on('update_profit', (profit) => { document.getElementById('admin-profit').textContent = profit.toLocaleString() + " so'm"; });
+
+    function renderAdminPlayers(players) {
+        const listContainer = document.getElementById('admin-players-list');
+        listContainer.innerHTML = "";
+        players.forEach(p => {
+            const item = document.createElement('div');
+            item.className = 'player-item';
+            item.innerHTML = `
+                <div>
+                    <small style="color:#94a3b8">ID: ${p.id}</small><br>
+                    <strong>${p.name}</strong><br>
+                    <span style="color:#22c55e">${p.balance.toLocaleString()} so'm</span>
+                </div>
+                <button class="btn-manage" onclick="managePlayerBalance('${p.id}', '${p.name}')">Boshqarish</button>
+            `;
+            listContainer.appendChild(item);
+        });
+    }
+
+    // 💰 ADMIN PUL O'TKAZISH VA YECHISH AMALIYOTI
+    function managePlayerBalance(id, name) {
+        const amountStr = prompt(`${name} (ID: ${id}) uchun amalni kiriting.\nSummani yozing (masalan: 50000):`);
+        if (!amountStr) return;
+        const amount = parseInt(amountStr);
+        if (isNaN(amount) || amount <= 0) return alert('Xato summa kiritildi!');
+
+        const action = prompt(`Pul qo'shish uchun: +\nPul ayirish (yechish) uchun: - \nbelgisini kiriting:`);
+        if (action === '+') {
+            socket.emit('admin_modify_balance', { id: id, amount: amount, type: 'plus' });
+        } else if (action === '-') {
+            socket.emit('admin_modify_balance', { id: id, amount: amount, type: 'minus' });
+        } else {
+            alert('Notoʻgʻri belgi kiritildi! Faqat + yoki - yozing.');
+        }
+    }
+
+    socket.on('admin_action_success', (msg) => { alert(msg); });
+
     socket.on('error_msg', (msg) => {
         alert(msg);
-        document.getElementById('bet-area').style.display = 'block';
-        document.getElementById('game-status').style.display = 'none';
-        document.getElementById('roll-btn').style.display = 'none';
-
-        // Agar parolda chalkashlik bo'lsa xotirani tozalab qayta yuklaydi
-        if (msg.includes("Xato ID")) {
-            localStorage.clear();
-            location.reload();
-        }
+        if (msg.includes("Xato ID")) { localStorage.clear(); location.reload(); }
     });
 
-    socket.on('force_cancel_game', () => {
-        currentRoomId = null;
-        document.getElementById('bet-area').style.display = 'block';
-        document.getElementById('game-status').style.display = 'none';
-        document.getElementById('roll-btn').style.display = 'none';
-    });
+    socket.on('force_cancel_game', () => { location.reload(); });
 
-    // Ekranlarni almashtirish funksiyasi
     function switchScreen(screenId) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.getElementById(screenId).classList.add('active');
     }
 </script>
-
 </body>
 </html>
