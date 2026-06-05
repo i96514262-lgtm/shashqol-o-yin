@@ -15,21 +15,68 @@
         .hidden { display: none; }
         .status-text { color: #4cc9f0; font-weight: bold; font-size: 1.1rem; margin: 15px 0; white-space: pre-line; }
         .online-badge { color: #f77f00; font-weight: bold; font-size: 1.1rem; margin-bottom: 10px; }
-        .tax-badge { background: #d62828; color: white; padding: 5px 12px; border-radius: 20px; display: inline-block; font-size: 0.85rem; font-weight: bold; margin-bottom: 15px; }
+        .id-badge { background: #f77f00; color: white; padding: 5px 12px; border-radius: 20px; display: inline-block; font-size: 0.9rem; font-weight: bold; margin-bottom: 10px; }
+        .timer-badge { color: #ef4444; font-weight: bold; font-size: 1.2rem; display: block; margin: 10px 0; }
+        
+        /* Admin Kassa Dizayni */
+        .admin-box { background: #111827; border: 2px solid #22c55e; max-width: 500px; }
+        .search-input { background: #1f2937; border: 1px solid #4b5563; }
+        .player-list-admin { text-align: left; max-height: 250px; overflow-y: auto; margin-top: 15px; background: #1f2937; padding: 10px; border-radius: 8px; }
+        .admin-player-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #374151; font-size: 0.9rem; }
+        .btn-small { padding: 6px 12px; font-size: 0.85rem; width: auto; margin: 0; background: #22c55e; color: white; }
+        .btn-plus { background: #22c55e; color: white; }
+        .btn-minus { background: #ef4444; color: white; }
     </style>
 </head>
 <body>
 
 <div class="box" id="login-screen">
-    <h2>🎯 OSHQ OʻYIN</h2>
-    <p>Oʻyinga kirish uchun ismingizni yozing:</p>
-    <input type="text" id="player-name" placeholder="Ismingiz...">
+    <h2>🎯 OSHQ OʻYIN TIZIMI</h2>
+    <p>Akkauntga kirish yoki yangi ochish:</p>
+    <input type="text" id="player-name" placeholder="Ismingizni yozing...">
+    <input type="text" id="player-id-input" placeholder="ID raqamingiz (Yangi kirayotganlar bo'sh qoldirsin)...">
     <button onclick="login()">Oʻyinga kirish</button>
+    
+    <hr style="border-color: #3a506b; margin: 20px 0;">
+    <button style="background: #f77f00; color: white;" onclick="document.getElementById('admin-login-area').classList.toggle('hidden')">⚙️ Kassa Tizimi (Admin)</button>
+    
+    <div id="admin-login-area" class="hidden">
+        <input type="password" id="admin-pass" placeholder="Kassa paroli...">
+        <button style="background: #22c55e; color: white;" onclick="loginAsAdmin()">Kirish</button>
+    </div>
+</div>
+
+<div class="box hidden admin-box" id="admin-screen">
+    <h2>👑 ASOSIY KASSA PANEL</h2>
+    <div style="background: #064e3b; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+        <p style="margin: 5px 0;">💰 Kassadagi jami 3% Soliq foydasi:</p>
+        <h2 id="company-profit" style="color: #4ade80; margin: 0;">0 soʻm</h2>
+    </div>
+    
+    <hr style="border-color: #4b5563;">
+    <h3>👥 Oʻyinchilarni qidirish va boshqarish</h3>
+    <input type="text" id="admin-search" class="search-input" placeholder="Ism yoki ID bo'yicha tezkor qidirish..." oninput="filterPlayers()">
+    
+    <div class="player-list-admin" id="admin-players-container"></div>
+
+    <div id="money-form" class="hidden" style="background: #1f2937; padding: 15px; border-radius: 8px; margin-top: 15px; text-align: left;">
+        <h4 id="action-title" style="margin: 0 0 10px 0; color: #4cc9f0;">Oʻyinchi: -</h4>
+        <input type="number" id="action-amount" placeholder="Summa (soʻm)...">
+        <div style="display: flex; gap: 10px;">
+            <button id="submit-plus-btn" class="btn-plus">➕ Pul oʻtkazish</button>
+            <button id="submit-minus-btn" class="btn-minus">➖ Qayta yechib olish</button>
+        </div>
+        <button style="background: #6b7280; color: white; margin-top: 5px;" onclick="hideMoneyForm()">Bekor qilish</button>
+    </div>
+
+    <button style="background: #ef4444; color: white; margin-top: 20px;" onclick="location.reload()">Chiqish</button>
 </div>
 
 <div class="box hidden" id="game-screen">
+    <div style="text-align: left;">
+        <div class="id-badge" id="user-id-display">Sizning ID raqamingiz: ----</div>
+    </div>
     <div class="online-badge">Onlayn oʻyinchilar: <span id="online-users">0</span> ta</div>
-    <div class="tax-badge">Kompaniya xizmati: 3%</div>
     
     <h2>OSHQ OʻYIN</h2>
     <h3 id="hello-text">Salom</h3>
@@ -39,35 +86,39 @@
     <div id="setup-area">
         <p>Tikish miqdorini tanlang:</p>
         <select id="bet-amount">
-            <option value="10000">10 000 soʻm</option>
             <option value="50000" selected>50 000 soʻm</option>
-            <option value="100000">100 000 soʻm</option>
-            <option value="500000">500 000 soʻm</option>
+            <option value="150000">150 000 soʻm</option>
+            <option value="400000">400 000 soʻm</option>
+            <option value="1000000">1 000 000 soʻm</option>
         </select>
         <button id="find-btn" style="background: #22c55e; color:white;" onclick="findOpponent()">Raqib qidirish</button>
     </div>
 
     <div id="play-area" class="hidden">
+        <div class="timer-badge" id="timer-area">Qolgan vaqt: <span id="countdown-sec">15</span> sek</div>
         <div class="status-text" id="status-msg">Raqib qidirilmoqda...</div>
         <button id="roll-btn" onclick="roll()" disabled>Oshiqlarni tashlash 🎲</button>
     </div>
-
-    <button id="buy-btn" style="background:#e11d48; color:white; display:none;" onclick="buyChips()">Pul sotib olish (500k)</button>
 </div>
 
 <script>
     const socket = io();
     let currentRoom = "";
+    let selectedPlayerIdForAction = null;
+    let allPlayersData = []; 
+    let visualTimerInterval = null;
 
     function login() {
-        const name = document.getElementById('player-name').value;
-        socket.emit('register_player', name);
+        const name = document.getElementById('player-name').value.trim();
+        const existingId = document.getElementById('player-id-input').value.trim();
+        socket.emit('register_player', { name: name, id: existingId });
     }
 
     socket.on('register_success', (data) => {
         document.getElementById('login-screen').classList.add('hidden');
         document.getElementById('game-screen').classList.remove('hidden');
-        document.getElementById('hello-text').innerText = data.name;
+        document.getElementById('hello-text').innerText = "👤 " + data.name;
+        document.getElementById('user-id-display').innerText = "Sizning IDingiz: " + data.id;
         document.getElementById('user-bal').innerText = data.balance.toLocaleString();
     });
 
@@ -75,11 +126,82 @@
         document.getElementById('online-users').innerText = count;
     });
 
+    function loginAsAdmin() {
+        const pass = document.getElementById('admin-pass').value;
+        socket.emit('admin_login', pass);
+    }
+
+    socket.on('admin_auth_success', (data) => {
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('admin-screen').classList.remove('hidden');
+        document.getElementById('company-profit').innerText = data.profit.toLocaleString() + " soʻm";
+        allPlayersData = data.players;
+        renderAdminPlayers(allPlayersData);
+    });
+
+    socket.on('admin_players_update', (players) => {
+        allPlayersData = players;
+        renderAdminPlayers(allPlayersData);
+    });
+
+    function renderAdminPlayers(list) {
+        const container = document.getElementById('admin-players-container');
+        container.innerHTML = "";
+        if(list.length === 0) {
+            container.innerHTML = "<p style='color:gray; text-align:center;'>Oʻyinchi topilmadi.</p>";
+            return;
+        }
+        list.forEach(p => {
+            let div = document.createElement('div');
+            div.className = "admin-player-item";
+            div.innerHTML = `
+                <div><b>ID: ${p.id}</b> | ${p.name} <br> <span style="color:#4ade80;">💰 ${p.balance.toLocaleString()} soʻm</span></div>
+                <div><button class="btn-small" onclick="openMoneyForm('${p.id}', '${p.name}')">Boshqarish</button></div>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function filterPlayers() {
+        const query = document.getElementById('admin-search').value.toLowerCase();
+        const filtered = allPlayersData.filter(p => p.name.toLowerCase().includes(query) || p.id.toString().includes(query));
+        renderAdminPlayers(filtered);
+    }
+
+    function openMoneyForm(id, name) {
+        selectedPlayerIdForAction = id;
+        document.getElementById('action-title').innerText = `Oʻyinchi: ${name} (ID: ${id})`;
+        document.getElementById('money-form').classList.remove('hidden');
+    }
+
+    function hideMoneyForm() {
+        document.getElementById('money-form').classList.add('hidden');
+        document.getElementById('action-amount').value = "";
+    }
+
+    document.getElementById('submit-plus-btn').onclick = () => {
+        const amt = parseInt(document.getElementById('action-amount').value);
+        if(isNaN(amt) || amt <= 0) return alert("To'g'ri summa kiriting!");
+        socket.emit('admin_modify_balance', { id: selectedPlayerIdForAction, amount: amt, type: 'plus' });
+        hideMoneyForm();
+    };
+
+    document.getElementById('submit-minus-btn').onclick = () => {
+        const amt = parseInt(document.getElementById('action-amount').value);
+        if(isNaN(amt) || amt <= 0) return alert("To'g'ri summa kiriting!");
+        socket.emit('admin_modify_balance', { id: selectedPlayerIdForAction, amount: amt, type: 'minus' });
+        hideMoneyForm();
+    };
+
+    socket.on('admin_action_success', (msg) => { alert(msg); });
+    socket.on('update_profit', (profit) => { document.getElementById('company-profit').innerText = profit.toLocaleString() + " soʻm"; });
+
     function findOpponent() {
         const bet = document.getElementById('bet-amount').value;
         socket.emit('find_opponent', bet);
         document.getElementById('setup-area').classList.add('hidden');
         document.getElementById('play-area').classList.remove('hidden');
+        document.getElementById('timer-area').classList.add('hidden'); // Qidiruvda vaqt ko'rinmaydi
     }
 
     socket.on('waiting_mode', (msg) => {
@@ -88,14 +210,25 @@
 
     socket.on('game_start', (data) => {
         currentRoom = data.roomId;
-        document.getElementById('status-msg').innerText = `Raqib topildi: ${data.p1} VS ${data.p2}!\nTikildi: ${data.bet.toLocaleString()} soʻm.\n\nOshiqlarni tashlang!`;
+        document.getElementById('status-msg').innerText = `Raqib topildi:\n🔥 ${data.p1} VS ${data.p2} 🔥\nTikildi: ${data.bet.toLocaleString()} soʻm.\n\nTosh tashlang!`;
         document.getElementById('roll-btn').disabled = false;
+        document.getElementById('timer-area').classList.remove('hidden');
+        
+        // ⏰ Ekrandagi vizual taymer
+        let timeLeft = 15;
+        document.getElementById('countdown-sec').innerText = timeLeft;
+        if(visualTimerInterval) clearInterval(visualTimerInterval);
+        visualTimerInterval = setInterval(() => {
+            timeLeft--;
+            document.getElementById('countdown-sec').innerText = timeLeft;
+            if(timeLeft <= 0) clearInterval(visualTimerInterval);
+        }, 1000);
     });
 
     function roll() {
         socket.emit('roll_dice', currentRoom);
         document.getElementById('roll-btn').disabled = true;
-        document.getElementById('status-msg').innerText = "Oshiqlarni tashladingiz. Raqib kutilmoqda...";
+        document.getElementById('status-msg').innerText = "Siz oshiqlarni tashladingiz. Raqib kutilmoqda...";
     }
 
     socket.on('player_rolled', (data) => {
@@ -103,25 +236,23 @@
     });
 
     socket.on('game_over', (data) => {
-        alert(data.result);
+        if(visualTimerInterval) clearInterval(visualTimerInterval);
+        alert("Oʻyin tugadi!\n" + data.result);
         
-        let myNewBalance = socket.id === data.p1Id ? data.p1Balance : data.p2Balance;
+        let myNewBalance = socket.id === data.p1SocketId ? data.p1Balance : data.p2Balance;
         document.getElementById('user-bal').innerText = myNewBalance.toLocaleString();
+        resetToLobby();
+    });
 
+    socket.on('force_cancel_game', () => {
+        if(visualTimerInterval) clearInterval(visualTimerInterval);
+        resetToLobby();
+    });
+
+    function resetToLobby() {
         document.getElementById('setup-area').classList.remove('hidden');
         document.getElementById('play-area').classList.add('hidden');
         document.getElementById('roll-btn').disabled = true;
-
-        if (myNewBalance < 10000) {
-            document.getElementById('buy-btn').style.display = "block";
-            document.getElementById('find-btn').disabled = true;
-        }
-    });
-
-    function buyChips() {
-        socket.emit('buy_chips');
-        document.getElementById('buy-btn').style.display = "none";
-        document.getElementById('find-btn').disabled = false;
     }
 
     socket.on('balance_updated', (newBal) => {
@@ -130,8 +261,7 @@
 
     socket.on('error_msg', msg => {
         alert(msg);
-        document.getElementById('setup-area').classList.remove('hidden');
-        document.getElementById('play-area').classList.add('hidden');
+        resetToLobby();
     });
 </script>
 </body>
