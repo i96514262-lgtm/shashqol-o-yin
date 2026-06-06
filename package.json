@@ -1,7 +1,15 @@
 {
-  "name": "oyin-platformasi",
+  "name": "oshiqlar-oyini",
   "version": "1.0.0",
+  "description": "Oshiqlar o'yini - 3D effektli shashqol",
   "main": "server.js",
-  "scripts": { "start": "node server.js" },
-  "dependencies": { "express": "^4.18.2" }
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }
