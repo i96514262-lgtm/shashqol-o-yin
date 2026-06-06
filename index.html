@@ -78,8 +78,8 @@
         <div style="margin-bottom:10px; font-size:0.9rem; background: rgba(255,255,255,0.03); padding:10px; border-radius:8px;">
             <div>Admin Banki: <b id="admBank" style="color:#10b981">100,000,000</b> UZS</div>
             <div style="margin-top:5px;">2% Soliq Tushumi: <b id="admTax" style="color:#eab308">0</b> UZS</div>
-            <!-- SOLIQNI BANKKA YESHISH TUGMASI -->
-            <button class="btn-tax-collect" onclick="soliqniBankkaOtkaz() listen">💰 Soliqni Bankka O'tkazish</button>
+            <!-- TUZATILGAN TUGMA KODI -->
+            <button class="btn-tax-collect" onclick="soliqniBankkaOtkaz()">💰 Soliqni Bankka O'tkazish</button>
         </div>
         
         <h3 style="color:#fff; font-size:1rem; text-align:left;">Akkauntlar balansi:</h3>
@@ -191,7 +191,6 @@
         document.getElementById('adminMatchList').innerHTML = mHtml || "Hozircha faol o'yinlar yo'q.";
     });
 
-    // Tugma bosilganda ishlaydigan funksiya
     function soliqniBankkaOtkaz() {
         socket.emit('collect_tax_to_bank');
     }
