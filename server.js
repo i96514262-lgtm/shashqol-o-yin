@@ -11,15 +11,13 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.static(__dirname));
 
-// VAQTINCHA XOTIRADA SAQLANADIGAN MA'LUMOTLAR
 let users = {}; 
 let activeRooms = [];
 let pendingBets = []; 
-let adminBank = 100000000; // 100 mln boshlang'ich
-let adminTaxProfit = 0; // Soliqdan tushgan foyda
-const ADMIN_SECRET_PIN = "7777"; // MAXFIY ADMIN PAROLI
+let adminBank = 100000000; // 100 mln boshlang'ich bank
+let adminTaxProfit = 0; // Soliqdan yig'ilib turgan pul
+const ADMIN_SECRET_PIN = "0613"; // Admin parol
 
-// 3 TA DOIMIY BOTLAR
 let bots = {
     "Bot_Alisher": { username: "Bot_Alisher", pin: "0000", balance: 15000000, isBot: true, winStreak: 0 },
     "Bot_Madina": { username: "Bot_Madina", pin: "0000", balance: 15000000, isBot: true, winStreak: 1 },
@@ -36,14 +34,13 @@ io.on('connection', (socket) => {
     
     updateGlobalStats();
 
-    // RO'YXATDAN O'TISH / TIZIMGA KIRISH
     socket.on('auth', (data) => {
         const { username, pin } = data;
         if (!users[username]) {
             users[username] = {
                 username: username,
                 pin: pin,
-                balance: 300000, // 300 ming bonus
+                balance: 300000, 
                 isBot: false,
                 socketId: socket.id
             };
@@ -61,7 +58,6 @@ io.on('connection', (socket) => {
         updateGlobalStats();
     });
 
-    // GAROV TIKISH MANTIQI
     socket.on('place_bet', (amount) => {
         amount = parseInt(amount);
         const user = users[socket.username];
@@ -86,7 +82,6 @@ io.on('connection', (socket) => {
                 socket.emit('balance_update', user.balance);
                 socket.emit('error_msg', "20 soniyada raqib topilmadi. Pul qaytarildi.");
                 
-                // 700,000 va 1,000,000 lik garovlarda botlar kiradi
                 if (amount === 700000 || amount === 1000000) {
                     activateBotMatch(socket.username, socket.id, amount);
                 }
@@ -98,7 +93,6 @@ io.on('connection', (socket) => {
         updateGlobalStats();
     });
 
-    // MAXFIY ADMIN PAROLINI TEKSHIRISH
     socket.on('admin_auth', (inputPin) => {
         if (inputPin === ADMIN_SECRET_PIN) {
             socket.isAdmin = true;
@@ -108,6 +102,7 @@ io.on('connection', (socket) => {
         }
     });
 
+    // ADMIN AMALLARI
     socket.on('admin_action', (data) => {
         if (!socket.isAdmin) return;
         const { targetUser, action, amount } = data;
@@ -117,13 +112,27 @@ io.on('connection', (socket) => {
                 adminBank -= amount;
             } else if (action === 'withdraw' && users[targetUser].balance >= amount) {
                 users[targetUser].balance -= amount;
-                adminBank += amount;
+                adminBank += amount; 
             }
             if (users[targetUser].socketId) {
                 io.to(users[targetUser].socketId).emit('balance_update', users[targetUser].balance);
             }
             sendAdminData(io); 
         }
+    });
+
+    // SOLIQNI BANKKA O'TKAZISH JONLI MANTIQI
+    socket.on('collect_tax_to_bank', () => {
+        if (!socket.isAdmin) return;
+        if (adminTaxProfit <= 0) {
+            socket.emit('admin_msg', "O'tkazish uchun soliq xizmatida pul yo'q!");
+            return;
+        }
+        // Soliq pullari o'chadi va bankka qo'shiladi
+        adminBank += adminTaxProfit;
+        adminTaxProfit = 0;
+        
+        sendAdminData(io); // hamma admin oynalarida ma'lumot yangilanadi
     });
 
     socket.on('disconnect', () => {
@@ -136,7 +145,7 @@ function startMatch(p1Name, p1Socket, p2Name, p2Socket, amount) {
     const totalPrize = amount * 2;
     const tax = totalPrize * 0.02; 
     const winAmount = totalPrize - tax;
-    adminTaxProfit += tax;
+    adminTaxProfit += tax; 
 
     const p1Roll = Math.floor(Math.random() * 4); 
     const p2Roll = Math.floor(Math.random() * 4);
@@ -199,7 +208,6 @@ function updateGlobalStats() {
 }
 
 function sendAdminData(target) {
-    // Faqat admin ruxsati borlarga ma'lumot uzatish
     if (target.emit) {
         target.emit('admin_update', {
             adminBank,
@@ -208,7 +216,6 @@ function sendAdminData(target) {
             activeRooms
         });
     } else {
-        // Broadkast xabarlar uchun tekshiruv
         target.sockets.sockets.forEach(s => {
             if (s.isAdmin) {
                 s.emit('admin_update', {
