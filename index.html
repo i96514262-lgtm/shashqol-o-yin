@@ -3,51 +3,121 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>O'yin</title>
+    <title>Oshiqlar O'yini</title>
     <style>
-        body { background-color: #1a1a2e; color: white; font-family: sans-serif; margin: 0; padding: 15px; }
-        .header { display: flex; justify-content: space-between; align-items: center; background: #16213e; padding: 10px; border-radius: 8px; font-weight: bold; }
-        .tax-panel { background: #28a745; text-align: center; padding: 15px; margin: 15px 0; border-radius: 8px; font-weight: bold; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .btn-bet { background: #1e88e5; border: none; padding: 20px; color: white; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        .btn-full { grid-column: span 2; background: #1e88e5; border: none; padding: 20px; color: white; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        .game-status { background: #16213e; padding: 20px; margin-top: 20px; border-radius: 8px; text-align: center; font-weight: bold; }
-        .btn-yellow { background: #ffc107; color: black; width: 100%; padding: 20px; border: none; font-size: 1.2rem; font-weight: bold; margin-top: 15px; border-radius: 8px; cursor: pointer; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: radial-gradient(circle, #1a3c40 0%, #06101e 100%); min-height: 100vh; display: flex; flex-direction: column; align-items: center; color: white; overflow-x: hidden; }
+        header { text-align: center; margin: 20px 0; padding: 10px; }
+        header h1 { font-size: 2.5rem; text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 15px #17b978; color: #17b978; }
+        
+        /* O'yin maydoni */
+        .game-container { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; max-width: 500px; padding: 20px; }
+        .mat { width: 300px; height: 300px; background: radial-gradient(circle, #226b4d 0%, #113627 100%); border: 12px solid #8B4513; border-radius: 50%; box-shadow: inset 0 0 20px rgba(0,0,0,0.6), 0 10px 25px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; perspective: 1000px; position: relative; margin-bottom: 30px; }
+        
+        /* Oshiq (Kubik) uslubi */
+        .dice-wrapper { width: 70px; height: 70px; position: relative; transform-style: preserve-3d; transition: transform 1.5s cubic-bezier(0.2, 0.8, 0.3, 1); }
+        .dice-face { position: absolute; width: 100%; height: 100%; background: #fffdf0; border: 2px solid #ccc; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; font-weight: bold; color: #222; box-shadow: inset 0 0 10px rgba(0,0,0,0.2); backface-visibility: hidden; }
+        
+        /* 3D Oshiq tomonlari koordinatalari */
+        .face-1 { transform: rotateY(0deg) translateZ(35px); background-color: #fcfcfc; } /* Alchi */
+        .face-2 { transform: rotateY(180deg) translateZ(35px); background-color: #f5f5f5; } /* Tova */
+        .face-3 { transform: rotateX(90deg) translateZ(35px); background-color: #eeeeee; } /* Chik */
+        .face-4 { transform: rotateX(-90deg) translateZ(35px); background-color: #e5e5e5; } /* Bok */
+        .face-5 { transform: rotateY(90deg) translateZ(35px); }
+        .face-6 { transform: rotateY(-90deg) translateZ(35px); }
+
+        .face-content { text-align: center; font-size: 11px; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; }
+        .face-content .emoji { font-size: 24px; margin-bottom: 2px; }
+
+        /* Tugma va Natija */
+        .btn-roll { padding: 14px 40px; font-size: 1.2rem; font-weight: bold; background: linear-gradient(135deg, #17b978 0%, #086940 100%); border: none; border-radius: 30px; color: white; cursor: pointer; box-shadow: 0 5px 15px rgba(23, 185, 120, 0.4); transition: 0.2s ease; margin-bottom: 25px; }
+        .btn-roll:active { transform: scale(0.95); box-shadow: 0 2px 5px rgba(23, 185, 120, 0.4); }
+        .result-box { background: rgba(255,255,255,0.1); padding: 15px 30px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.2); text-align: center; width: 100%; backdrop-filter: blur(5px); }
+        .result-title { font-size: 1.4rem; color: #ffca28; margin-bottom: 5px; min-height: 33px; }
+        .score-board { display: flex; justify-content: space-around; margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px; font-size: 0.9rem; color: #ddd; }
+        .score-val { font-weight: bold; color: #17b978; font-size: 1.1rem; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <span>ID: 887766</span>
-        <span>👥 1,245</span>
-        <span id="balance">$ 300,000</span>
+
+    <header>
+        <h1>Oshiqlar O'yini</h1>
+        <p>Shashqol tashlang va omadingizni sinang!</p>
+    </header>
+
+    <div class="game-container">
+        <div class="mat">
+            <div class="dice-wrapper" id="oshiq">
+                <!-- 4 ta asosiy holat: Alchi, Tova, Chik, Bok -->
+                <div class="dice-face face-1"><div class="face-content"><span class="emoji">👑</span><b>Alchi</b></div></div>
+                <div class="dice-face face-2"><div class="face-content"><span class="emoji">🛡️</span><b>Tova</b></div></div>
+                <div class="dice-face face-3"><div class="face-content"><span class="emoji">🎯</span><b>Chik</b></div></div>
+                <div class="dice-face face-4"><div class="face-content"><span class="emoji">❌</span><b>Bok</b></div></div>
+                <!-- Qo'shimcha muvozanat tomonlari -->
+                <div class="dice-face face-5"><div class="face-content"><span class="emoji">👑</span><b>Alchi</b></div></div>
+                <div class="dice-face face-6"><div class="face-content"><span class="emoji">🛡️</span><b>Tova</b></div></div>
+            </div>
+        </div>
+
+        <button class="btn-roll" id="rollBtn" onclick="tashlaOshiqni()">Oshiqni Otish</button>
+
+        <div class="result-box">
+            <div class="result-title" id="status text">Oshiq otishni kuting...</div>
+            <div class="score-board">
+                <div>Alchi (Ochko): <span id="alchiCount" class="score-val">0</span></div>
+                <div>Jami otishlar: <span id="totalCount" class="score-val">0</span></div>
+            </div>
+        </div>
     </div>
-    <div class="tax-panel">KAMPANIYA SOLIG'I: 2%</div>
-    <div class="grid">
-        <button class="btn-bet" onclick="selectBet(50000)">50 000</button>
-        <button class="btn-bet" onclick="selectBet(100000)">100 000</button>
-        <button class="btn-bet" onclick="selectBet(300000)">300 000</button>
-        <button class="btn-bet" onclick="selectBet(700000)">700 000</button>
-        <button class="btn-full" onclick="selectBet(1000000)">1 000 000</button>
-    </div>
-    <div class="game-status" id="status">Summani tanlang</div>
-    <button class="btn-yellow" onclick="placeBet()">GAROV TIKISH</button>
-    <a href="/admin" style="display: block; margin-top: 20px; color: #555; text-align: center; font-size: 10px;">Admin Panel</a>
 
     <script>
-        let currentBalance = 300000;
-        let selectedAmount = 0;
-        function selectBet(amount) {
-            selectedAmount = amount;
-            document.getElementById('status').innerText = amount.toLocaleString() + " so'm tanlandi.";
-        }
-        function placeBet() {
-            if (selectedAmount > 0 && currentBalance >= selectedAmount) {
-                currentBalance -= selectedAmount;
-                document.getElementById('balance').innerText = "$ " + currentBalance.toLocaleString();
-                alert("Garov qabul qilindi!");
-            } else {
-                alert("Summani tanlang yoki mablag' yetarli emas!");
-            }
+        let alchiOchko = 0;
+        let jamiOtishlar = 0;
+
+        const oshiqElement = document.getElementById('oshiq');
+        const statusText = document.getElementById('status text');
+        const rollBtn = document.getElementById('rollBtn');
+
+        // Oshiq holatlariga mos 3D burchaklar rotatsiyasi
+        const holatlar = [
+            { nom: "Alchi (Omad!)", x: 0, y: 0, ochko: 5 },
+            { nom: "Tova", x: 0, y: 180, ochko: 2 },
+            { nom: "Chik", x: -90, y: 0, ochko: 1 },
+            { nom: "Bok (Yutqazdingiz)", x: 90, y: 0, ochko: 0 }
+        ];
+
+        function tashlaOshiqni() {
+            rollBtn.disabled = true;
+            statusText.innerText = "Oshiq aylanmoqda...";
+            
+            // Tasodifiy aylanish effektini berish
+            const extraRoundsX = Math.floor(Math.random() * 4) + 4; 
+            const extraRoundsY = Math.floor(Math.random() * 4) + 4;
+            
+            // Tasodifiy holatni tanlash (Alchi, Tova, Chik yoki Bok)
+            const randomIndex = Math.floor(Math.random() * holatlar.length);
+            const tanlanganHolat = holatlar[randomIndex];
+
+            const targetX = tanlanganHolat.x + (extraRoundsX * 360);
+            const targetY = tanlanganHolat.y + (extraRoundsY * 360);
+
+            // Animatsiyani qo'llash
+            oshiqElement.style.transform = `rotateX(${targetX}deg) rotateY(${targetY}deg)`;
+
+            setTimeout(() => {
+                // Natijalarni hisoblash
+                jamiOtishlar++;
+                if(tanlanganHolat.ochko > 0) {
+                    alchiOchko += tanlanganHolat.ochko;
+                }
+                
+                // UI yangilash
+                statusText.innerText = `Natija: ${tanlanganHolat.nom}!`;
+                document.getElementById('alchiCount').innerText = alchiOchko;
+                document.getElementById('totalCount').innerText = jamiOtishlar;
+                
+                rollBtn.disabled = false;
+            }, 1500); // 1.5 soniyadan keyin to'xtaydi
         }
     </script>
 </body>
