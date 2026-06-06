@@ -26,8 +26,14 @@ let bots = {
 
 Object.assign(users, bots);
 
+// Oddiy o'yinchilar uchun oyna
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Admin uchun alohida maxfiy oyna
+app.get('/admin-panel', (req, res) => {
+    res.sendFile(path.join(__dirname, 'admin.html'));
 });
 
 io.on('connection', (socket) => {
@@ -102,7 +108,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // ADMIN AMALLARI
     socket.on('admin_action', (data) => {
         if (!socket.isAdmin) return;
         const { targetUser, action, amount } = data;
@@ -121,18 +126,15 @@ io.on('connection', (socket) => {
         }
     });
 
-    // SOLIQNI BANKKA O'TKAZISH JONLI MANTIQI
     socket.on('collect_tax_to_bank', () => {
         if (!socket.isAdmin) return;
         if (adminTaxProfit <= 0) {
             socket.emit('admin_msg', "O'tkazish uchun soliq xizmatida pul yo'q!");
             return;
         }
-        // Soliq pullari o'chadi va bankka qo'shiladi
         adminBank += adminTaxProfit;
         adminTaxProfit = 0;
-        
-        sendAdminData(io); // hamma admin oynalarida ma'lumot yangilanadi
+        sendAdminData(io); 
     });
 
     socket.on('disconnect', () => {
@@ -152,12 +154,11 @@ function startMatch(p1Name, p1Socket, p2Name, p2Socket, amount) {
 
     let winnerName = p1Name;
     let winnerSocket = p1Socket;
-    let loserName = p2Name;
     let r1 = "Alchi 👑", r2 = "Bok ❌";
 
     if (p2Roll < p1Roll) { 
         winnerName = p2Name; winnerSocket = p2Socket;
-        loserName = p1Name; r1 = "Bok ❌"; r2 = "Alchi 👑";
+        r1 = "Bok ❌"; r2 = "Alchi 👑";
     }
 
     users[winnerName].balance += winAmount;
@@ -175,20 +176,13 @@ function activateBotMatch(humanName, humanSocket, amount) {
     const botNames = Object.keys(bots);
     const selectedBot = users[botNames[Math.floor(Math.random() * botNames.length)]];
     
-    users[humanName].balance -= amount;
-    
     const totalPrize = amount * 2;
     const tax = totalPrize * 0.02;
     const winAmount = totalPrize - tax;
     adminTaxProfit += tax;
 
-    let humanWins = true;
-    if (selectedBot.winStreak === 0) {
-        humanWins = false;
-        selectedBot.winStreak = 1; 
-    } else {
-        selectedBot.winStreak = 0; 
-    }
+    let humanWins = selectedBot.winStreak !== 0;
+    selectedBot.winStreak = humanWins ? 0 : 1;
 
     if (humanWins) {
         users[humanName].balance += winAmount;
@@ -203,30 +197,21 @@ function activateBotMatch(humanName, humanSocket, amount) {
 }
 
 function updateGlobalStats() {
-    let onlineCount = Object.keys(io.sockets.sockets).length + 3; 
+    let onlineCount = Object.keys(io.sockets.sockets).length + 3; // Botlar bilan qo'shib ko'rsatadi
     io.emit('global_stats', { onlineCount, pendingCount: pendingBets.length });
 }
 
 function sendAdminData(target) {
-    if (target.emit) {
-        target.emit('admin_update', {
-            adminBank,
-            adminTaxProfit,
-            users: Object.values(users).map(u => ({ username: u.username, balance: u.balance, isBot: u.isBot })),
-            activeRooms
-        });
-    } else {
-        target.sockets.sockets.forEach(s => {
-            if (s.isAdmin) {
-                s.emit('admin_update', {
-                    adminBank,
-                    adminTaxProfit,
-                    users: Object.values(users).map(u => ({ username: u.username, balance: u.balance, isBot: u.isBot })),
-                    activeRooms
-                });
-            }
-        });
-    }
+    io.sockets.sockets.forEach(s => {
+        if (s.isAdmin) {
+            s.emit('admin_update', {
+                adminBank,
+                adminTaxProfit,
+                users: Object.values(users).map(u => ({ username: u.username, balance: u.balance, isBot: u.isBot })),
+                activeRooms
+            });
+        }
+    });
 }
 
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
