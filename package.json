@@ -1,13 +1,14 @@
 {
   "name": "oshiqlar-oyini",
   "version": "1.0.0",
-  "description": "Oshiqlar o'yini - 3D effektli shashqol",
+  "description": "Oshiqlar o'yini - Multiplayer & Admin Panel",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
   },
   "engines": {
     "node": ">=18.0.0"
