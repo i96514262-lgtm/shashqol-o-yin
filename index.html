@@ -22,11 +22,6 @@
         .btn-bet-choice { background: #1e3154; border: 1px solid #2e4775; padding: 15px; font-size: 1rem; border-radius: 10px; color: white; font-weight: bold; cursor: pointer; }
         .btn-bet-choice:hover { background: #273f6b; border-color: #17b978; }
         .btn-bet-choice.selected { background: #17b978; color: white; border-color: #fff; box-shadow: 0 0 10px rgba(23,185,120,0.5); }
-        
-        .admin-lock-box { background: #1f1313; border: 1px dashed #ff4444; text-align: center; }
-        .admin-box { background: #1c1111; border: 2px solid #ff4444; display: none; }
-        .user-row { display: flex; justify-content: space-between; background: rgba(0,0,0,0.3); padding: 8px; margin: 4px 0; font-radius: 6px; font-size: 0.85rem; }
-        .btn-tax-collect { background: linear-gradient(135deg, #eab308 0%, #ca8a04 100%); color: black; font-size: 0.85rem; padding: 8px; font-weight: bold; border-radius: 6px; border: none; margin-top: 5px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -47,7 +42,7 @@
         </div>
         
         <div class="stats-grid" style="margin-top:8px; background:transparent; padding:5px 0;">
-            <div>onlayn o'yinchilar sonini: <span id="onlineCount" style="color:#10b981; font-weight:bold;">4</span> ta</div>
+            <div>Onlayn o'yinchilar: <span id="onlineCount" style="color:#10b981; font-weight:bold;">0</span> ta</div>
             <div>Kutilmoqda: <span id="pendingCount" style="color:#ffca28; font-weight:bold;">0</span> ta garov</div>
         </div>
         <div class="tax-notice">💰 2% Kompaniya Solig'i mavjud</div>
@@ -65,37 +60,6 @@
         <button id="btnBet" onclick="garovTikish()" style="background: linear-gradient(135deg, #e11d48 0%, #9f1239 100%);">GAROV TIKISH</button>
         
         <div id="statusText" style="text-align:center; margin-top:15px; font-weight:bold; color:#ffca28; min-height:40px;"></div>
-    </div>
-
-    <div class="card admin-lock-box" id="adminLockBox">
-        <p style="color:#ff4444; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">🔒 Admin panel yopiq</p>
-        <input type="password" id="adminSecretPin" placeholder="Admin 4 xonali kodini kiriting..." style="padding:8px; width:60%; font-size:0.9rem;">
-        <button onclick="adminKirish()" style="padding:8px; width:35%; font-size:0.9rem; background:#ff4444; display:inline-block; margin-left:2px;">Kirish</button>
-    </div>
-    
-    <div class="card admin-box" id="adminBox">
-        <h2 style="color:#ff4444;">Admin Boshqaruv Paneli ✅</h2>
-        <div style="margin-bottom:10px; font-size:0.9rem; background: rgba(255,255,255,0.03); padding:10px; border-radius:8px;">
-            <div>Admin Banki: <b id="admBank" style="color:#10b981">100,000,000</b> UZS</div>
-            <div style="margin-top:5px;">2% Soliq Tushumi: <b id="admTax" style="color:#eab308">0</b> UZS</div>
-            <!-- TUZATILGAN TUGMA KODI -->
-            <button class="btn-tax-collect" onclick="soliqniBankkaOtkaz()">💰 Soliqni Bankka O'tkazish</button>
-        </div>
-        
-        <h3 style="color:#fff; font-size:1rem; text-align:left;">Akkauntlar balansi:</h3>
-        <div id="adminUserList" style="max-height:140px; overflow-y:auto; margin-bottom:10px; border:1px solid #333;"></div>
-
-        <h3 style="color:#fff; font-size:1rem; text-align:left;">Balans Boshqarish:</h3>
-        <input type="text" id="admTarget" placeholder="Oyinchi ismi..." style="padding:8px; margin:2px 0;">
-        <select id="admAction" style="width:100%; padding:10px; border-radius:8px; background:#1b2a47; color:white; margin:4px 0;">
-            <option value="add">Pul solish (+ Bankdan)</option>
-            <option value="withdraw">Pul yechish (- Bankka)</option>
-        </select>
-        <input type="number" id="admAmount" placeholder="Summa..." style="padding:8px; margin:2px 0;">
-        <button style="background:#ff4444; padding:10px; margin-top:5px;" onclick="adminAmal_bajar()">AMALNI BAJARISH</button>
-
-        <h3 style="color:#fff; font-size:1rem; text-align:left; margin-top:10px;">Jonli o'yinlar tarixi:</h3>
-        <div id="adminMatchList" style="font-size:0.8rem; color:#aaa; background:#000; padding:5px; border-radius:6px; max-height:100px; overflow-y:auto;"></div>
     </div>
 
 </div>
@@ -122,7 +86,6 @@
     });
 
     socket.on('auth_error', (msg) => alert(msg));
-    socket.on('admin_msg', (msg) => alert(msg));
     
     socket.on('error_msg', (msg) => {
         document.getElementById('statusText').innerText = msg;
@@ -163,45 +126,6 @@
         document.getElementById('onlineCount').innerText = data.onlineCount;
         document.getElementById('pendingCount').innerText = data.pendingCount;
     });
-
-    function adminKirish() {
-        const pin = document.getElementById('adminSecretPin').value;
-        socket.emit('admin_auth', pin);
-    }
-
-    socket.on('admin_auth_failed', (msg) => alert(msg));
-
-    socket.on('admin_update', (data) => {
-        document.getElementById('adminLockBox').style.display = 'none'; 
-        document.getElementById('adminBox').style.display = 'block'; 
-        
-        document.getElementById('admBank').innerText = data.adminBank.toLocaleString();
-        document.getElementById('admTax').innerText = data.adminTaxProfit.toLocaleString();
-        
-        let uHtml = "";
-        data.users.forEach(u => {
-            uHtml += `<div class='user-row'><span>${u.username} ${u.isBot?'🤖':''}</span><b>${u.balance.toLocaleString()} UZS</b></div>`;
-        });
-        document.getElementById('adminUserList').innerHTML = uHtml;
-
-        let mHtml = "";
-        data.activeRooms.forEach(r => {
-            mHtml += `<div style="margin-bottom:2px;">${r.p1} vs ${r.p2} (${r.amount.toLocaleString()}) -> G'olib: <b>${r.winner}</b></div>`;
-        });
-        document.getElementById('adminMatchList').innerHTML = mHtml || "Hozircha faol o'yinlar yo'q.";
-    });
-
-    function soliqniBankkaOtkaz() {
-        socket.emit('collect_tax_to_bank');
-    }
-
-    function adminAmal_bajar() {
-        const targetUser = document.getElementById('admTarget').value.trim();
-        const action = document.getElementById('admAction').value;
-        const amount = parseInt(document.getElementById('admAmount').value);
-        if(!targetUser || !amount) return alert("Ma'lumotlarni kiriting!");
-        socket.emit('admin_action', { targetUser, action, amount });
-    }
 </script>
 </body>
 </html>
