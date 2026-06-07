@@ -10,14 +10,13 @@
         .card { background: #1e293b; padding: 25px; border-radius: 16px; width: 90%; max-width: 380px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); text-align: center; }
         .header-info { display: flex; justify-content: space-between; font-size: 14px; color: #94a3b8; margin-bottom: 15px; }
         .balance-box { font-size: 26px; font-weight: bold; color: #10b981; margin: 10px 0; }
-        .tax-info { font-size: 12px; color: #fbbf24; margin-bottom: 20px; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
         .room-btn { background: #334155; border: 2px solid transparent; color: white; padding: 15px; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
         .room-btn.selected { background: #10b981; box-shadow: 0 0 12px #10b981; }
-        .full-btn { background: #1e1b4b; border: 2px dashed #fbbf24; grid-column: span 2; position: relative; }
-        .action-btn { background: #ef4444; color: white; border: none; width: 100%; padding: 16px; font-size: 18px; font-weight: bold; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 6px rgba(239,68,68,0.2); }
-        .status-panel { margin-top: 15px; padding: 12px; background: #0f172a; border-radius: 8px; font-size: 14px; display: none; }
-        .timer { font-size: 20px; color: #ef4444; font-weight: bold; margin-top: 5px; }
+        .full-btn { background: #1e1b4b; border: 2px dashed #fbbf24; grid-column: span 2; }
+        .action-btn { background: #ef4444; color: white; border: none; width: 100%; padding: 16px; font-size: 18px; font-weight: bold; border-radius: 12px; cursor: pointer; }
+        .status-panel { margin-top: 15px; padding: 12px; background: #0f172a; border-radius: 8px; font-size: 15px; display: none; }
+        .timer { font-size: 24px; color: #ef4444; font-weight: bold; margin-top: 5px; }
     </style>
 </head>
 <body>
@@ -25,24 +24,23 @@
 <div class="card">
     <div class="header-info">
         <div>O'yinchi: <span id="lblUsername" style="color:#fbbf24; font-weight:bold;">Iz</span></div>
-        <div>Onlayn: <span id="lblOnline" style="color:#10b981; font-weight:bold;">1 ta</span></div>
+        <div>Onlayn o'yinchilar: <span id="lblOnline" style="color:#10b981; font-weight:bold;">1 ta</span></div>
     </div>
 
     <div class="balance-box" id="lblBalance">0 UZS</div>
-    <div class="tax-info">⚡ 2% Kompaniya Solig'i faol</div>
+    <div style="font-size: 12px; color: #a1a1aa; margin-bottom: 15px;">Kutilmoqda: <span style="color:#fbbf24">0 ta garov</span></div>
 
-    <h3 style="text-align: left; font-size: 16px; margin-bottom: 10px;">Xonani Tanlang:</h3>
     <div class="grid">
         <button class="room-btn" onclick="selectRoom(40000, this)">40,000</button>
         <button class="room-btn" onclick="selectRoom(100000, this)">100,000</button>
         <button class="room-btn" onclick="selectRoom(300000, this)">300,000</button>
         <button class="room-btn" onclick="selectRoom(700000, this)">700,000</button>
         <button class="room-btn" onclick="selectRoom(1000000, this)">1,000,000</button>
-        <button class="room-btn full-btn" onclick="selectRoom(1200000, this)">💎 1,200,000 <br><span style="font-size:10px;font-weight:normal;color:#94a3b8;">Faqat Odamlar</span></button>
+        <button class="room-btn full-btn" onclick="selectRoom(1200000, this)">💎 1,200,000 <br><span style="font-size:10px;color:#94a3b8;">Faqat Odamlar</span></button>
     </div>
 
     <div id="statusPanel" class="status-panel">
-        <div id="gameOpponent">Raqib kutilmoqda...</div>
+        <div id="gameOpponent">Raqib qidirilmoqda...</div>
         <div class="timer" id="gameTimer">20</div>
     </div>
 
@@ -51,11 +49,10 @@
 
 <script>
     const socket = io();
-    let currentUsername = "Iz"; // Xohlasangiz buni prompt orqali dinamik qilishingiz mumkin
+    let currentUsername = "Iz"; 
     let selectedAmount = 0;
     let currentRoomId = null;
 
-    // Sahifa yuklanganda foydalanuvchi ma'lumotlarini olish
     async function loadUserData() {
         document.getElementById('lblUsername').innerText = currentUsername;
         const res = await fetch('/api/users-list');
@@ -67,7 +64,6 @@
     }
     loadUserData();
 
-    // Onlayn foydalanuvchilar soni yangilanishi (Realtime)
     socket.on('online-count', (data) => {
         document.getElementById('lblOnline').innerText = data.count + " ta";
     });
@@ -91,31 +87,26 @@
         if(data.success) {
             currentRoomId = data.room.roomId;
             socket.emit('join-room', currentRoomId);
-            
             document.getElementById('statusPanel').style.display = 'block';
             document.getElementById('btnAction').disabled = true;
-            document.getElementById('btnAction').innerText = "KUTILMOQDA...";
+            document.getElementById('btnAction').innerText = "RAQIB KUTILMOQDA...";
 
-            if(data.room.player2) {
-                handleMatchStart(data.room);
-            }
-        } else {
-            alert(data.message || "Xatolik yuz berdi!");
-        }
+            if(data.room.player2) { handleMatchStart(data.room); }
+        } else { alert("Mablag' yetarli emas yoki xato!"); }
     }
 
     function handleMatchStart(room) {
         let opponent = room.player1 === currentUsername ? room.player2 : room.player1;
-        document.getElementById('gameOpponent').innerHTML = `🎮 Raqib: <b style="color:#ef4444">${opponent}</b>`;
+        document.getElementById('gameOpponent').innerHTML = `🎮 Kim bilan o'ynayapti: <b style="color:#ef4444">${opponent}</b>`;
         document.getElementById('btnAction').disabled = false;
         document.getElementById('btnAction').style.background = "#10b981";
-        document.getElementById('btnAction').innerText = "🎲 TOSH TASHLAH";
+        document.getElementById('btnAction').innerText = "🎲 TOSHLARNI TASHLAH";
         document.getElementById('btnAction').onclick = rollDice;
     }
 
     async function rollDice() {
         document.getElementById('btnAction').disabled = true;
-        document.getElementById('btnAction').innerText = "YURILDI...";
+        document.getElementById('btnAction').innerText = "YURILDINGIZ...";
         await fetch('/api/roll-dice', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -123,23 +114,11 @@
         });
     }
 
-    // Sockets Orqali O'yin hodisalarini tinglash
-    socket.on('match-started', (data) => {
-        handleMatchStart(data.room);
-    });
-
-    socket.on('timer-update', (data) => {
-        document.getElementById('gameTimer').innerText = data.timeLeft;
-    });
-
-    socket.on('player-rolled', (data) => {
-        if(data.username !== currentUsername) {
-            document.getElementById('gameOpponent').innerHTML += "<br><span style='color:#10b981;font-size:12px;'>Raqib tosh tashladi!</span>";
-        }
-    });
+    socket.on('match-started', (data) => { handleMatchStart(data.room); });
+    socket.on('timer-update', (data) => { document.getElementById('gameTimer').innerText = data.timeLeft; });
 
     socket.on('game-finished', (data) => {
-        alert(`${data.result}\nSiz tashlagan ochko tizim tomonidan hisoblandi.`);
+        alert(data.result);
         document.getElementById('statusPanel').style.display = 'none';
         document.getElementById('btnAction').disabled = false;
         document.getElementById('btnAction').style.background = "#ef4444";
