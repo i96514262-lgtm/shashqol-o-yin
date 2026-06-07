@@ -5,30 +5,32 @@
     <title>Oshiqlar O'yini</title>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        body { background: #111c24; color: white; text-align: center; font-family: sans-serif; padding: 20px; }
-        .header { background: #1a2f3d; padding: 20px; border-radius: 10px; }
-        .btn { padding: 15px; margin: 10px; width: 40%; background: #1a2f3d; color: white; border: 1px solid #254053; border-radius: 8px; cursor: pointer; }
-        .active { background: #2ecc71; border: 1px solid #2ecc71; }
-        .main-btn { background: #e74c3c; width: 90%; padding: 20px; font-size: 20px; border: none; color: white; border-radius: 10px; cursor: pointer; }
+        :root { --primary: #7209b7; --bg: #0f172a; --card: #1e293b; --text: #f8fafc; }
+        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; text-align: center; padding: 20px; }
+        .hero { background: linear-gradient(135deg, #3a0ca3, #7209b7); padding: 25px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
+        .balance-val { font-size: 28px; font-weight: bold; display: block; margin-top: 5px; }
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
+        .btn { padding: 15px; border: none; background: var(--card); color: white; border-radius: 12px; cursor: pointer; transition: 0.3s; border: 1px solid #334155; }
+        .btn.active { background: #4ade80; color: #000; font-weight: bold; border-color: #22c55e; }
+        .main-btn { width: 100%; padding: 20px; margin-top: 20px; background: #f43f5e; color: white; border: none; border-radius: 12px; font-size: 18px; cursor: pointer; box-shadow: 0 5px 15px rgba(244, 63, 94, 0.4); }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h2>O'yinchi: Iz</h2>
-        <h3>Balans: <span id="user-balance">5,000,000</span> so'm</h3>
-        <p style="color: #f1c40f;">💰 2% Kompaniya Solig'i mavjud</p>
+    <div class="hero">
+        <p>O'yinchi: <b>Iz</b></p>
+        <span class="balance-val" id="user-balance">5,000,000 UZS</span>
+        <p style="font-size: 12px; opacity: 0.8; margin-top: 10px;">💰 2% Soliq tizimi faol</p>
     </div>
 
     <h3>Garov summasini tanlang:</h3>
-    <button class="btn" onclick="selectBet(40000, this)">40,000</button>
-    <button class="btn" onclick="selectBet(100000, this)">100,000</button><br>
-    <button class="btn" onclick="selectBet(300000, this)">300,000</button>
-    <button class="btn active" onclick="selectBet(700000, this)">700,000</button><br>
-    <button class="btn" onclick="selectBet(1000000, this)">1,000,000</button>
-
-    <br><br>
+    <div class="btn-grid">
+        <button class="btn" onclick="selectBet(40000, this)">40,000</button>
+        <button class="btn" onclick="selectBet(100000, this)">100,000</button>
+        <button class="btn" onclick="selectBet(300000, this)">300,000</button>
+        <button class="btn active" onclick="selectBet(700000, this)">700,000</button>
+    </div>
     <button class="main-btn" onclick="playGame()">GAROV TIKISH</button>
-    
+
     <script>
         let selectedAmount = 700000;
         function selectBet(amt, el) { 
@@ -37,15 +39,11 @@
             el.classList.add('active');
         }
         async function playGame() {
-            const res = await fetch('/api/place-bet', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({username: "Iz", betAmount: selectedAmount})
-            });
+            const res = await fetch('/api/place-bet', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username: "Iz", betAmount: selectedAmount})});
             const data = await res.json();
             if(data.success) {
-                document.getElementById('user-balance').innerText = data.userBalance.toLocaleString();
-                Swal.fire(data.opponent, data.result);
+                document.getElementById('user-balance').innerText = data.userBalance.toLocaleString() + " UZS";
+                Swal.fire({ title: 'Natija', text: data.result, icon: 'info' });
             } else { alert(data.message); }
         }
     </script>
