@@ -31,14 +31,19 @@ const botSchema = new mongoose.Schema({
 const Bot = mongoose.model('Bot', botSchema);
 
 
-// 3. ASOSIY SAHIFANI YUKLASH (Cannot GET / xatoligini oldini olish uchun)
+// 3. VEB-SAHIFALAR MARSHRUTLARI (ROUTES)
+
+// A) Asosiy o'yin sahifasi (https://shashqol-o-yin.onrender.com)
 app.get('/', (req, res) => {
-    // Agar index.html faylingiz shundoq bosh papkada bo'lsa:
+    // Agar index.html shundoq bosh papkada bo'lsa
     res.sendFile(path.join(__dirname, 'index.html'));
-    
-    // AGAR index.html faylingiz 'public' papkasi ichida bo'lsa, yuqoridagi qatorni o'chirib,
-    // pastdagi qatorni ochib qo'ying:
-    // res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// B) Admin panel sahifasi (Sizda skrinshotda chiqqan url uchun)
+// Agar brauzerda /admin-panel yoki shunga o'xshash manzil yozilganda xato bermasligi uchun:
+app.get('/admin-panel', (req, res) => {
+    // Agar admin faylingiz nomi boshqacha bo'lsa (masalan admin.html), nomini o'zgartiring
+    res.sendFile(path.join(__dirname, 'admin.html')); 
 });
 
 
@@ -60,7 +65,7 @@ app.post('/api/login', async (req, res) => {
 });
 
 
-// 5. BAZADA BOTLARNAVTOMATIK YARATISH (Agar bazada yo'q bo'lsa)
+// 5. BAZADA BOTLARNI AVTOMATIK YARATISH
 async function createBotsIfNotExist() {
     const defaultBots = ["Bot_Alisher", "Bot_Madina", "Bot_Jasur", "Bot_Sardor", "Bot_Farrux"];
     for (let botName of defaultBots) {
@@ -73,7 +78,7 @@ async function createBotsIfNotExist() {
 createBotsIfNotExist();
 
 
-// 6. ENGL ASOSIY QISM: GAROV TIKISH VA O'YIN MANTIQI (0 soniya kutish va aldov algoritmi)
+// 6. ENGL ASOSIY QISM: GAROV TIKISH VA O'YIN MANTIQI
 app.post('/api/place-bet', async (req, res) => {
     try {
         const { username, betAmount } = req.body;
@@ -112,14 +117,14 @@ app.post('/api/place-bet', async (req, res) => {
         let userScore, botScore;
         let gameResultText = "";
 
-        // QOIDA 3 & 4: Bot 2 marta yutib, 1 marta yutqazadi (Sikl: 1-bot yutadi, 2-bot yutadi, 3-Siz yutasiz)
+        // QOIDA 3 & 4: Bot 2 marta yutib, 1 marta yutqazadi
         if (user.gameCounter % 3 !== 0) {
             // BOT YUTADI (2 marta)
             botScore = Math.floor(Math.random() * 3) + 10; // Bot ochkosi baland (10-12)
             userScore = Math.floor(Math.random() * 5) + 2;  // Sizning ochkongiz past (2-6)
             
             bot.balance += totalPrize; // Bot pulni yutib oldi
-            gameResultText = `G'olib: ${randomBotName}`; // Foydalanuvchiga "Bot_" so'zisiz ko'rsatiladi!
+            gameResultText = `G'olib: ${randomBotName}`;
         } else {
             // SIZ YUTASIZ (1 marta)
             userScore = Math.floor(Math.random() * 3) + 10; // Sizning ochkongiz baland (10-12)
@@ -129,14 +134,14 @@ app.post('/api/place-bet', async (req, res) => {
             gameResultText = `G'olib: ${user.username}`;
         }
 
-        // Natijalarni bazada yangilash (Botning ham, Sizning ham pulingiz to'g'ri hisoblandi)
+        // Natijalarni bazada yangilash
         await user.save();
         await bot.save();
 
         // Natijani darhol (0 soniyada) frontandga qaytarish
         res.json({
             success: true,
-            opponent: randomBotName, // Raqib ismi (Foydalanuvchi buni haqiqiy odam deb o'ylaydi)
+            opponent: randomBotName, 
             userScore,
             botScore,
             result: gameResultText,
@@ -159,7 +164,7 @@ app.post('/api/admin/manage-balance', async (req, res) => {
 
         let target = await User.findOne({ username });
         if (!target) {
-            target = await Bot.findOne({ name: username }); // Agar foydalanuvchi bo'lmasa, botlardan qidiradi
+            target = await Bot.findOne({ name: username }); // Botlardan qidiradi
         }
 
         if (!target) return res.status(404).json({ success: false, message: "Profil topilmadi!" });
