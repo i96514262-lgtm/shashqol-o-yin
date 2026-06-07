@@ -1,261 +1,174 @@
 const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const path = require('path');
 const mongoose = require('mongoose');
+const cors = require('cors');
 require('dotenv').config();
 
-const User = require('./models/User');
-
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
 
-const PORT = process.env.PORT || 3000;
+// O'rta dasturlar (Middleware)
+app.use(cors());
+app.use(express.json());
+app.use(express.static('public')); // Agar frontend fayllaringiz shu loyihada bo'lsa
 
-app.use(express.static(__dirname));
-
-let activeRooms = [];
-let pendingBets = []; 
-let adminBank = 100000000; 
-let adminTaxProfit = 0; 
-const ADMIN_SECRET_PIN = process.env.ADMIN_SECRET_PIN || "0613";
-
-// MongoDB-ga xavfsiz ulanish
+// 1. MONGODB'GA ULANISH
 mongoose.connect(process.env.MONGO_URI)
-    .then(async () => {
-        console.log("💡 MongoDB Atlas-ga muvaffaqiyatli ulanildi...");
-        await botiarniTekshirish();
-    })
-    .catch((err) => console.error("❌ MongoDB ulanishida xatolik:", err));
+  .then(() => console.log('MongoDB-ga muvaffaqiyatli ulandi!'))
+  .catch(err => console.error('MongoDB ulanishida xato:', err));
 
-// Tizim uchun botlarni bazada shakllantirish
-async function botiarniTekshirish() {
-    const bots = [
-        { username: "Bot_Alisher", pin: "0000", balance: 15000000, isBot: true },
-        { username: "Bot_Madina", pin: "0000", balance: 15000000, isBot: true },
-        { username: "Bot_Jasur", pin: "0000", balance: 15000000, isBot: true }
-    ];
-    for (let bot of bots) {
-        const mavjudBot = await User.findOne({ username: bot.username });
-        if (!mavjudBot) {
-            await User.create(bot);
-        }
-    }
-}
-
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+// 2. MA'LUMOTLAR MODELLARI (SCHEMAS)
+const userSchema = new mongoose.Schema({
+    username: { type: String, required: true, unique: true },
+    balance: { type: Number, default: 5000000 }, // Yangi foydalanuvchiga 5 mln so'm start puli
+    gameCounter: { type: Number, default: 0 }    // O'yinlar sonini hisoblash (2 ta yutqazib, 1 ta yutish uchun)
 });
+const User = mongoose.model('User', userSchema);
 
-app.get('/admin-panel', (req, res) => {
-    res.sendFile(path.join(__dirname, 'admin.html'));
+const botSchema = new mongoose.Schema({
+    name: { type: String, required: true, unique: true },
+    balance: { type: Number, default: 15000000 } // Botlarning boshlang'ich balansi
 });
+const Bot = mongoose.model('Bot', botSchema);
 
-io.on('connection', async (socket) => {
-    await updateGlobalStats();
 
-    // Avtorizatsiya va Ro'yxatdan o'tish tizimi
-    socket.on('auth', async (data) => {
-        const { username, pin } = data;
-        if (!username || !pin) return socket.emit('auth_error', "Ma'lumotlarni to'liq kiriting!");
+// 3. FOYDALANUVCHINI TIZIMGA KIRITISH (LOGIN / REGISTER)
+app.post('/api/login', async (req, res) => {
+    try {
+        const { username } = req.body;
+        if (!username) return res.status(400).json({ success: false, message: "Ism kiritilmadi!" });
 
-        try {
-            let user = await User.findOne({ username: username });
-
-            if (!user) {
-                user = new User({ username, pin, balance: 300000, isBot: false });
-                await user.save();
-                socket.emit('auth_success', { username, balance: 300000, msg: "Xush kelibsiz! 300,000 so'm bonus berildi." });
-            } else {
-                if (user.pin === pin) {
-                    socket.emit('auth_success', { username, balance: user.balance, msg: "Akkauntga qaytadingiz!" });
-                } else {
-                    socket.emit('auth_error', "Xato PIN-kod yoki ushbu ism band!");
-                    return;
-                }
-            }
-            socket.username = username;
-            socket.userId = user._id;
-            await updateGlobalStats();
-        } catch (err) {
-            socket.emit('auth_error', "Tizimda xatolik yuz berdi.");
-        }
-    });
-
-    // Pul tikish va Raqib qidirish mantiqi
-    socket.on('place_bet', async (amount) => {
-        amount = parseInt(amount);
-        if (isNaN(amount) || amount <= 0) return socket.emit('error_msg', "Noto'g'ri summa!");
-
-        const user = await User.findOne({ username: socket.username });
-        if (!user || user.balance < amount) {
-            socket.emit('error_msg', "Mablag' yetarli emas!");
-            return;
-        }
-
-        user.balance -= amount;
-        await user.save();
-        socket.emit('balance_update', user.balance);
-
-        let opponent = pendingBets.find(b => b.amount === amount && b.username !== socket.username);
-
-        if (opponent) {
-            pendingBets = pendingBets.filter(b => b.socketId !== opponent.socketId);
-            clearTimeout(opponent.timeoutId);
-            startMatch(socket.username, socket.id, opponent.username, opponent.socketId, amount);
-        } else {
-            const timeoutId = setTimeout(async () => {
-                pendingBets = pendingBets.filter(b => b.socketId !== socket.id);
-                
-                await User.updateOne({ username: socket.username }, { $inc: { balance: amount } });
-                const yangiUser = await User.findOne({ username: socket.username });
-                socket.emit('balance_update', yangiUser.balance);
-                socket.emit('error_msg', "Raqib topilmadi. Pul qaytarildi.");
-                
-                if (amount === 700000 || amount === 1000000) {
-                    activateBotMatch(socket.username, socket.id, amount);
-                }
-            }, 20000);
-
-            pendingBets.push({ socketId: socket.id, username: socket.username, amount, timeoutId });
-            socket.emit('waiting_match', `Raqib qidirilmoqda (${amount.toLocaleString()} so'm)...`);
-        }
-        await updateGlobalStats();
-    });
-
-    // Admin tizimi
-    socket.on('admin_auth', (inputPin) => {
-        if (inputPin === ADMIN_SECRET_PIN) {
-            socket.isAdmin = true;
-            sendAdminData();
-        } else {
-            socket.emit('admin_auth_failed', "Xato admin kodi!");
-        }
-    });
-
-    socket.on('admin_action', async (data) => {
-        if (!socket.isAdmin) return;
-        const { targetUser, action, amount } = data;
-        
-        const user = await User.findOne({ username: targetUser });
-        if (user) {
-            if (action === 'add' && adminBank >= amount) {
-                user.balance += amount;
-                adminBank -= amount;
-            } else if (action === 'withdraw' && user.balance >= amount) {
-                user.balance -= amount;
-                adminBank += amount; 
-            }
+        let user = await User.findOne({ username });
+        if (!user) {
+            // Agar bunday ismli odam bo'lmasa, yangi ochadi
+            user = new User({ username });
             await user.save();
-
-            const targetSocket = [...io.sockets.sockets.values()].find(s => s.username === targetUser);
-            if (targetSocket) targetSocket.emit('balance_update', user.balance);
-            sendAdminData(); 
         }
-    });
-
-    socket.on('collect_tax_to_bank', () => {
-        if (!socket.isAdmin) return;
-        if (adminTaxProfit <= 0) return;
-        adminBank += adminTaxProfit;
-        adminTaxProfit = 0;
-        sendAdminData(); 
-    });
-
-    socket.on('disconnect', async () => {
-        pendingBets = pendingBets.filter(b => b.socketId !== socket.id);
-        await updateGlobalStats();
-    });
+        res.json({ success: true, username: user.username, balance: user.balance });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Tizimda xatolik yuz berdi" });
+    }
 });
 
-// Real O'yinchilar o'rtasidagi o'yin
-async function startMatch(p1Name, p1Socket, p2Name, p2Socket, amount) {
-    const totalPrize = amount * 2;
-    const tax = totalPrize * 0.02; 
-    const winAmount = totalPrize - tax;
-    adminTaxProfit += tax; 
 
-    const p1Roll = Math.floor(Math.random() * 4); 
-    const p2Roll = Math.floor(Math.random() * 4);
-
-    let winnerName = p1Name;
-    let winnerSocket = p1Socket;
-    let r1 = "Alchi 👑", r2 = "Bok ❌";
-
-    if (p2Roll > p1Roll) { 
-        winnerName = p2Name; winnerSocket = p2Socket;
-        r1 = "Bok ❌"; r2 = "Alchi 👑";
-    } else if (p1Roll === p2Roll) {
-        await User.updateOne({ username: p1Name }, { $inc: { balance: amount } });
-        await User.updateOne({ username: p2Name }, { $inc: { balance: amount } });
-        
-        const u1 = await User.findOne({ username: p1Name });
-        const u2 = await User.findOne({ username: p2Name });
-
-        if(io.sockets.sockets.get(p1Socket)) io.to(p1Socket).emit('match_result', { win: false, roll: "Durang 🤝", oppRoll: "Durang 🤝", prize: 0, balance: u1.balance });
-        if(io.sockets.sockets.get(p2Socket)) io.to(p2Socket).emit('match_result', { win: false, roll: "Durang 🤝", oppRoll: "Durang 🤝", prize: 0, balance: u2.balance });
-        return;
-    }
-
-    await User.updateOne({ username: winnerName }, { $inc: { balance: winAmount } });
-    
-    const u1 = await User.findOne({ username: p1Name });
-    const u2 = await User.findOne({ username: p2Name });
-
-    if(io.sockets.sockets.get(p1Socket)) io.to(p1Socket).emit('match_result', { win: winnerName === p1Name, roll: r1, oppRoll: r2, prize: winAmount, balance: u1.balance });
-    if(io.sockets.sockets.get(p2Socket)) io.to(p2Socket).emit('match_result', { win: winnerName === p2Name, roll: r2, oppRoll: r1, prize: winAmount, balance: u2.balance });
-
-    activeRooms.push({ p1: p1Name, p2: p2Name, amount: amount, winner: winnerName });
-    if (activeRooms.length > 8) activeRooms.shift(); 
-    sendAdminData();
-}
-
-// Bot bilan o'yin mantiqi
-async function activateBotMatch(humanName, humanSocket, amount) {
-    const bots = await User.find({ isBot: true });
-    if(bots.length === 0) return;
-    const selectedBot = bots[Math.floor(Math.random() * bots.length)];
-    
-    const totalPrize = amount * 2;
-    const tax = totalPrize * 0.02;
-    const winAmount = totalPrize - tax;
-    adminTaxProfit += tax;
-
-    let humanWins = Math.random() > 0.5;
-
-    if (humanWins) {
-        await User.updateOne({ username: humanName }, { $inc: { balance: winAmount } });
-        const hUser = await User.findOne({ username: humanName });
-        io.to(humanSocket).emit('match_result', { win: true, roll: "Alchi 👑", oppRoll: "Bok ❌", prize: winAmount, balance: hUser.balance });
-    } else {
-        await User.updateOne({ username: selectedBot.username }, { $inc: { balance: winAmount } });
-        const hUser = await User.findOne({ username: humanName });
-        io.to(humanSocket).emit('match_result', { win: false, roll: "Tova 🛡️", oppRoll: "Alchi 👑", prize: 0, balance: hUser.balance });
-    }
-
-    activeRooms.push({ p1: humanName, p2: selectedBot.username, amount: amount, winner: humanWins ? humanName : selectedBot.username });
-    if (activeRooms.length > 8) activeRooms.shift();
-    sendAdminData();
-}
-
-async function updateGlobalStats() {
-    let onlineCount = io.sockets.sockets.size + 3; 
-    io.emit('global_stats', { onlineCount, pendingCount: pendingBets.length });
-}
-
-async function sendAdminData() {
-    const barchaOynchilar = await User.find({});
-    io.sockets.sockets.forEach(s => {
-        if (s.isAdmin) {
-            s.emit('admin_update', {
-                adminBank,
-                adminTaxProfit,
-                users: barchaOynchilar.map(u => ({ username: u.username, balance: u.balance, isBot: u.isBot })),
-                activeRooms
-            });
+// 4. BAZADA BOTLARNI AVTOMATIK YARATISH (Agar bazada yo'q bo'lsa)
+async function createBotsIfNotExist() {
+    const defaultBots = ["Bot_Alisher", "Bot_Madina", "Bot_Jasur", "Bot_Sardor", "Bot_Farrux"];
+    for (let botName of defaultBots) {
+        const exist = await Bot.findOne({ name: botName });
+        if (!exist) {
+            await new Bot({ name: botName, balance: 20000000 }).save();
         }
-    });
+    }
 }
+createBotsIfNotExist();
 
-server.listen(PORT, () => console.log(`🚀 Server ${PORT}-portda muvaffaqiyatli ishlamoqda...`));
+
+// 5. ENGL ASOSIY QISM: GAROV TIKISH VA O'YIN MANTIQI (0 soniya kutish va aldov algoritmi)
+app.post('/api/place-bet', async (req, res) => {
+    try {
+        const { username, betAmount } = req.body;
+        const parsedBet = parseInt(betAmount);
+
+        // Foydalanuvchini tekshirish
+        const user = await User.findOne({ username });
+        if (!user) return res.status(404).json({ success: false, message: "Foydalanuvchi topilmadi!" });
+        
+        if (user.balance < parsedBet) {
+            return res.status(400).json({ success: false, message: "Mablag' yetarli emas!" });
+        }
+
+        // QOIDA 1: Botlar faqat 700,000 va 1,000,000 so'mlik garovlarda o'ynaydi
+        if (parsedBet < 700000) {
+            return res.status(400).json({ success: false, message: "Raqiblar faqat 700,000 va 1,000,000 so'mlik garovlarni qabul qilishadi!" });
+        }
+
+        // Tasodifiy bitta botni tanlash
+        const botNames = ["Alisher", "Madina", "Jasur", "Sardor", "Farrux"];
+        const randomBotName = botNames[Math.floor(Math.random() * botNames.length)];
+        const bot = await Bot.findOne({ name: `Bot_${randomBotName}` });
+
+        if (!bot || bot.balance < parsedBet) {
+            return res.status(400).json({ success: false, message: "Hozircha bo'sh raqib topilmadi, qayta urinib ko'ring!" });
+        }
+
+        // QOIDA 2: O'yin boshlanishi bilanoq ikkala tomondan ham pul ayiriladi
+        user.balance -= parsedBet;
+        bot.balance -= parsedBet;
+        const totalPrize = parsedBet * 2; // O'yin jamg'armasi
+
+        // O'yinlar hisoblagichini oshiramiz
+        user.gameCounter += 1;
+
+        let userScore, botScore;
+        let gameResultText = "";
+
+        // QOIDA 3 & 4: Bot 2 marta yutib, 1 marta yutqazadi (Sikl: 1-bot yutadi, 2-bot yutadi, 3-Siz yutasiz)
+        if (user.gameCounter % 3 !== 0) {
+            // BOT YUTADI (2 marta)
+            botScore = Math.floor(Math.random() * 3) + 10; // Bot ochkosi baland (10-12)
+            userScore = Math.floor(Math.random() * 5) + 2;  // Sizning ochkongiz past (2-6)
+            
+            bot.balance += totalPrize; // Bot pulni yutib oldi, balansi ko'paydi
+            gameResultText = `G'olib: ${randomBotName}`; // Foydalanuvchiga "Bot_" so'zisiz ko'rsatiladi!
+        } else {
+            // SIZ YUTASIZ (1 marta)
+            userScore = Math.floor(Math.random() * 3) + 10; // Sizning ochkongiz baland (10-12)
+            botScore = Math.floor(Math.random() * 5) + 2;  // Bot ochkosi past (2-6)
+            
+            user.balance += totalPrize; // Siz pulni yutib oldingiz, balansingiz ko'paydi
+            gameResultText = `G'olib: ${user.username}`;
+        }
+
+        // Natijalarni bazada yangilash (Botning ham, Sizning ham pulingiz to'g'ri hisoblandi)
+        await user.save();
+        await bot.save();
+
+        // Natijani darhol (0 soniyada) frontandga qaytarish
+        res.json({
+            success: true,
+            opponent: randomBotName, // Raqib ismi (Foydalanuvchi buni haqiqiy odam deb o'ylaydi)
+            userScore,
+            botScore,
+            result: gameResultText,
+            userBalance: user.balance,
+            botBalance: bot.balance
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: "Serverda ichki xatolik yuz berdi" });
+    }
+});
+
+
+// 6. ADMIN PANEL UCHUN BALANS BOSHQARISH (Depozit va Chiqarish)
+app.post('/api/admin/manage-balance', async (req, res) => {
+    try {
+        const { username, action, amount } = req.body;
+        const parsedAmount = parseInt(amount);
+
+        let target = await User.findOne({ username });
+        if (!target) {
+            target = await Bot.findOne({ name: username }); // Agar foydalanuvchi bo'lmasa, botlardan qidiradi
+        }
+
+        if (!target) return res.status(404).json({ success: false, message: "Profil topilmadi!" });
+
+        if (action === "add") {
+            target.balance += parsedAmount;
+        } else if (action === "withdraw") {
+            target.balance -= parsedAmount;
+        }
+
+        await target.save();
+        res.json({ success: true, message: "Balans muvaffaqiyatli yangilandi!", newBalance: target.balance });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Xatolik yuz berdi" });
+    }
+});
+
+
+// PORTNI ESHITISH
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Server ${PORT}-portda daxshatli rejimda ishlamoqda...`);
+});
