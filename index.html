@@ -3,124 +3,150 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Oshiqlar Pro</title>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <title>Oshiqlar O'yini</title>
+    <script src="/socket.io/socket.io.js"></script>
     <style>
-        :root { --neon-green: #10b981; --neon-red: #f43f5e; --dark-blue: #0f172a; --card-bg: #1e293b; }
-        body { background: var(--dark-blue); color: white; font-family: sans-serif; padding: 15px; margin: 0; text-align: center; }
-        .header-card { background: linear-gradient(145deg, #1e293b, #0f172a); padding: 25px; border-radius: 24px; border: 1px solid #334155; margin-bottom: 20px; }
-        .balance-val { font-size: 32px; font-weight: 800; color: var(--neon-green); text-shadow: 0 0 10px rgba(16, 185, 129, 0.3); }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; }
-        .btn { height: 75px; font-size: 18px; font-weight: bold; border: 1px solid #334155; background: var(--card-bg); color: white; border-radius: 16px; cursor: pointer; transition: all 0.2s ease; }
-        .btn.active { background: var(--neon-green); border-color: white; color: black; box-shadow: 0 0 15px var(--neon-green); }
-        .main-action-btn { width: 100%; height: 75px; background: linear-gradient(90deg, var(--neon-red), #e11d48); border: none; border-radius: 18px; color: white; font-size: 22px; font-weight: bold; cursor: pointer; box-shadow: 0 5px 20px rgba(244, 63, 94, 0.4); }
-        .timer-box { font-size: 18px; color: #eab308; margin-top: 15px; font-weight: bold; display: none; }
+        body { background-color: #0f172a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .card { background: #1e293b; padding: 25px; border-radius: 16px; width: 90%; max-width: 380px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); text-align: center; }
+        .header-info { display: flex; justify-content: space-between; font-size: 14px; color: #94a3b8; margin-bottom: 15px; }
+        .balance-box { font-size: 26px; font-weight: bold; color: #10b981; margin: 10px 0; }
+        .tax-info { font-size: 12px; color: #fbbf24; margin-bottom: 20px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+        .room-btn { background: #334155; border: 2px solid transparent; color: white; padding: 15px; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .room-btn.selected { background: #10b981; box-shadow: 0 0 12px #10b981; }
+        .full-btn { background: #1e1b4b; border: 2px dashed #fbbf24; grid-column: span 2; position: relative; }
+        .action-btn { background: #ef4444; color: white; border: none; width: 100%; padding: 16px; font-size: 18px; font-weight: bold; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 6px rgba(239,68,68,0.2); }
+        .status-panel { margin-top: 15px; padding: 12px; background: #0f172a; border-radius: 8px; font-size: 14px; display: none; }
+        .timer { font-size: 20px; color: #ef4444; font-weight: bold; margin-top: 5px; }
     </style>
 </head>
 <body>
 
-    <div class="header-card">
-        <p style="margin: 0; opacity: 0.7;">O'yinchi: <b style="color: #fff;">Iz</b></p>
-        <div class="balance-val" id="user-balance">5,000,000 UZS</div>
-        <p style="font-size: 12px; color: #94a3b8; margin-top: 5px;">⚡️ 2% Kompaniya Solig'i faol</p>
+<div class="card">
+    <div class="header-info">
+        <div>O'yinchi: <span id="lblUsername" style="color:#fbbf24; font-weight:bold;">Iz</span></div>
+        <div>Onlayn: <span id="lblOnline" style="color:#10b981; font-weight:bold;">1 ta</span></div>
     </div>
 
-    <h3 style="text-align: left; margin-left: 5px;">Xonani Tanlang:</h3>
+    <div class="balance-box" id="lblBalance">0 UZS</div>
+    <div class="tax-info">⚡ 2% Kompaniya Solig'i faol</div>
+
+    <h3 style="text-align: left; font-size: 16px; margin-bottom: 10px;">Xonani Tanlang:</h3>
     <div class="grid">
-        <button class="btn" onclick="selectBet(40000, this)">40,000</button>
-        <button class="btn" onclick="selectBet(100000, this)">100,000</button>
-        <button class="btn" onclick="selectBet(300000, this)">300,000</button>
-        <button class="btn active" onclick="selectBet(700000, this)">700,000</button>
-        <button class="btn" onclick="selectBet(1000000, this)">1,000,000</button>
-        <button class="btn" onclick="selectBet(1200000, this)">1,200,000</button>
+        <button class="room-btn" onclick="selectRoom(40000, this)">40,000</button>
+        <button class="room-btn" onclick="selectRoom(100000, this)">100,000</button>
+        <button class="room-btn" onclick="selectRoom(300000, this)">300,000</button>
+        <button class="room-btn" onclick="selectRoom(700000, this)">700,000</button>
+        <button class="room-btn" onclick="selectRoom(1000000, this)">1,000,000</button>
+        <button class="room-btn full-btn" onclick="selectRoom(1200000, this)">💎 1,200,000 <br><span style="font-size:10px;font-weight:normal;color:#94a3b8;">Faqat Odamlar</span></button>
     </div>
 
-    <button class="main-action-btn" id="action-btn" onclick="startMatchmake()">GAROV TIKISH</button>
-    <div class="timer-box" id="timer-box">⏳ Tosh tashlash vaqti: <span id="countdown">20</span>s</div>
+    <div id="statusPanel" class="status-panel">
+        <div id="gameOpponent">Raqib kutilmoqda...</div>
+        <div class="timer" id="gameTimer">20</div>
+    </div>
 
-    <script>
-        let selectedAmount = 700000;
-        let currentRoomId = null;
-        let timerInterval = null;
+    <button class="action-btn" id="btnAction" onclick="startMatchmake()">GAROV TIKISH</button>
+</div>
 
-        function selectBet(amt, el) { 
-            selectedAmount = amt; 
-            document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
-            el.classList.add('active');
+<script>
+    const socket = io();
+    let currentUsername = "Iz"; // Xohlasangiz buni prompt orqali dinamik qilishingiz mumkin
+    let selectedAmount = 0;
+    let currentRoomId = null;
+
+    // Sahifa yuklanganda foydalanuvchi ma'lumotlarini olish
+    async function loadUserData() {
+        document.getElementById('lblUsername').innerText = currentUsername;
+        const res = await fetch('/api/users-list');
+        const data = await res.json();
+        if(data.success) {
+            const me = data.users.find(u => u.username === currentUsername);
+            if(me) document.getElementById('lblBalance').innerText = me.balance.toLocaleString() + " UZS";
         }
+    }
+    loadUserData();
 
-        async function startMatchmake() {
-            document.getElementById('action-btn').innerText = "Raqib qidirilmoqda...";
-            const res = await fetch('/api/matchmake', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ username: "Iz", betAmount: selectedAmount })
-            });
-            const data = await res.json();
+    // Onlayn foydalanuvchilar soni yangilanishi (Realtime)
+    socket.on('online-count', (data) => {
+        document.getElementById('lblOnline').innerText = data.count + " ta";
+    });
+
+    function selectRoom(amount, btn) {
+        selectedAmount = amount;
+        document.querySelectorAll('.room-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+    }
+
+    async function startMatchmake() {
+        if(selectedAmount === 0) return alert("Iltimos xonani tanlang!");
+
+        const res = await fetch('/api/matchmake', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ username: currentUsername, betAmount: selectedAmount })
+        });
+        const data = await res.json();
+
+        if(data.success) {
+            currentRoomId = data.room.roomId;
+            socket.emit('join-room', currentRoomId);
             
-            if(data.success) {
-                currentRoomId = data.room.roomId;
-                Swal.fire({ title: 'Xona topildi', text: 'Tosh tashlashingiz mumkin.', icon: 'success', timer: 1500, showConfirmButton: false });
-                enableDiceRoll();
-            } else {
-                Swal.fire('Xato', data.message, 'error');
-                document.getElementById('action-btn').innerText = "GAROV TIKISH";
+            document.getElementById('statusPanel').style.display = 'block';
+            document.getElementById('btnAction').disabled = true;
+            document.getElementById('btnAction').innerText = "KUTILMOQDA...";
+
+            if(data.room.player2) {
+                handleMatchStart(data.room);
             }
+        } else {
+            alert(data.message || "Xatolik yuz berdi!");
         }
+    }
 
-        function enableDiceRoll() {
-            document.getElementById('action-btn').innerText = "🎲 TOSH TASHLAH";
-            document.getElementById('action-btn').setAttribute("onclick", "rollDice()");
-            document.getElementById('timer-box').style.display = "block";
-            
-            let timeLeft = 20;
-            document.getElementById('countdown').innerText = timeLeft;
-            clearInterval(timerInterval);
-            timerInterval = setInterval(() => {
-                timeLeft--;
-                document.getElementById('countdown').innerText = timeLeft;
-                if(timeLeft <= 0) {
-                    clearInterval(timerInterval);
-                    Swal.fire('Vaqt tugadi!', 'O\'yin yangilandi.', 'error');
-                    resetGame();
-                }
-            }, 1000);
+    function handleMatchStart(room) {
+        let opponent = room.player1 === currentUsername ? room.player2 : room.player1;
+        document.getElementById('gameOpponent').innerHTML = `🎮 Raqib: <b style="color:#ef4444">${opponent}</b>`;
+        document.getElementById('btnAction').disabled = false;
+        document.getElementById('btnAction').style.background = "#10b981";
+        document.getElementById('btnAction').innerText = "🎲 TOSH TASHLAH";
+        document.getElementById('btnAction').onclick = rollDice;
+    }
+
+    async function rollDice() {
+        document.getElementById('btnAction').disabled = true;
+        document.getElementById('btnAction').innerText = "YURILDI...";
+        await fetch('/api/roll-dice', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ roomId: currentRoomId, username: currentUsername })
+        });
+    }
+
+    // Sockets Orqali O'yin hodisalarini tinglash
+    socket.on('match-started', (data) => {
+        handleMatchStart(data.room);
+    });
+
+    socket.on('timer-update', (data) => {
+        document.getElementById('gameTimer').innerText = data.timeLeft;
+    });
+
+    socket.on('player-rolled', (data) => {
+        if(data.username !== currentUsername) {
+            document.getElementById('gameOpponent').innerHTML += "<br><span style='color:#10b981;font-size:12px;'>Raqib tosh tashladi!</span>";
         }
+    });
 
-        async function rollDice() {
-            clearInterval(timerInterval);
-            document.getElementById('timer-box').style.display = "none";
-            
-            const res = await fetch('/api/roll-dice', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ roomId: currentRoomId, username: "Iz" })
-            });
-            const data = await res.json();
-
-            if(data.success) {
-                if(data.waitingForOpponent) {
-                    Swal.fire('Kutilmoqda', 'Raqib yurishi kutilmoqda...', 'info');
-                } else {
-                    Swal.fire({
-                        title: data.result,
-                        html: `Siz: <b>${data.scores.p1}</b> | Raqib: <b>${data.scores.p2}</b>`,
-                        icon: data.result.includes("Iz") ? 'success' : 'warning'
-                    });
-                    if(data.myBalance) document.getElementById('user-balance').innerText = data.myBalance.toLocaleString() + " UZS";
-                    resetGame();
-                }
-            } else {
-                resetGame();
-            }
-        }
-
-        function resetGame() {
-            document.getElementById('action-btn').innerText = "GAROV TIKISH";
-            document.getElementById('action-btn').setAttribute("onclick", "startMatchmake()");
-            document.getElementById('timer-box').style.display = "none";
-            clearInterval(timerInterval);
-        }
-    </script>
+    socket.on('game-finished', (data) => {
+        alert(`${data.result}\nSiz tashlagan ochko tizim tomonidan hisoblandi.`);
+        document.getElementById('statusPanel').style.display = 'none';
+        document.getElementById('btnAction').disabled = false;
+        document.getElementById('btnAction').style.background = "#ef4444";
+        document.getElementById('btnAction').innerText = "GAROV TIKISH";
+        document.getElementById('btnAction').onclick = startMatchmake;
+        loadUserData();
+    });
+</script>
 </body>
 </html>
