@@ -1,7 +1,7 @@
 {
-  "name": "shashqol-o-yin",
+  "name": "oshiqlar-pro",
   "version": "1.0.0",
-  "description": "",
+  "description": "Oshiqlar o'yini server qismi",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -12,5 +12,8 @@
     "express": "^4.19.2",
     "mongoose": "^8.3.1",
     "socket.io": "^4.7.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
