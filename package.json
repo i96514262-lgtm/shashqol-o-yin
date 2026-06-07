@@ -1,7 +1,7 @@
 {
-  "name": "oshiqlar-pro",
+  "name": "oshiqlar-oyini",
   "version": "1.0.0",
-  "description": "Oshiqlar o'yini server qismi",
+  "description": "Oshiqlar o'yini rasmiy render loyihasi",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
