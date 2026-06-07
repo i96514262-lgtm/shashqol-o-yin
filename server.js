@@ -6,10 +6,10 @@ require('dotenv').config();
 
 const app = express();
 
-// O'rta dasturlar (Middleware)
+// Middleware sozlamalari
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public'))); // public papkasidagi CSS/JS fayllar uchun
+app.use(express.urlencoded({ extended: true }));
 
 // 1. MONGODB'GA ULANISH
 mongoose.connect(process.env.MONGO_URI)
@@ -19,35 +19,40 @@ mongoose.connect(process.env.MONGO_URI)
 // 2. MA'LUMOTLAR MODELLARI (SCHEMAS)
 const userSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
-    balance: { type: Number, default: 5000000 }, // Yangi foydalanuvchiga 5 mln so'm start puli
-    gameCounter: { type: Number, default: 0 }    // O'yinlar sonini hisoblash (2 ta yutqazib, 1 ta yutish uchun)
+    balance: { type: Number, default: 5000000 },
+    gameCounter: { type: Number, default: 0 }
 });
 const User = mongoose.model('User', userSchema);
 
 const botSchema = new mongoose.Schema({
     name: { type: String, required: true, unique: true },
-    balance: { type: Number, default: 15000000 } // Botlarning boshlang'ich balansi
+    balance: { type: Number, default: 15000000 }
 });
 const Bot = mongoose.model('Bot', botSchema);
 
-
-// 3. VEB-SAHIFALAR MARSHRUTLARI (ROUTES)
-
-// A) Asosiy o'yin sahifasi (https://shashqol-o-yin.onrender.com)
+// 3. SAHIFALARNI YUKLASH (ROUTES)
+// O'yinning asosiy oynasi
 app.get('/', (req, res) => {
-    // Agar index.html shundoq bosh papkada bo'lsa
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// B) Admin panel sahifasi (Sizda skrinshotda chiqqan url uchun)
-// Agar brauzerda /admin-panel yoki shunga o'xshash manzil yozilganda xato bermasligi uchun:
+// Admin panel oynasi (Xatolikni oldini olish uchun)
 app.get('/admin-panel', (req, res) => {
-    // Agar admin faylingiz nomi boshqacha bo'lsa (masalan admin.html), nomini o'zgartiring
-    res.sendFile(path.join(__dirname, 'admin.html')); 
+    res.sendFile(path.join(__dirname, 'admin.html'));
 });
 
+// Hamma foydalanuvchilar va botlarni jadval uchun olish API
+app.get('/api/users-list', async (req, res) => {
+    try {
+        const users = await User.find({});
+        const bots = await Bot.find({});
+        res.json({ success: true, users, bots });
+    } catch (error) {
+        res.status(500).json({ success: false });
+    }
+});
 
-// 4. FOYDALANUVCHINI TIZIMGA KIRITISH (LOGIN / REGISTER)
+// 4. LOGIN / REGISTER API
 app.post('/api/login', async (req, res) => {
     try {
         const { username } = req.body;
@@ -64,8 +69,7 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-
-// 5. BAZADA BOTLARNI AVTOMATIK YARATISH
+// BAZADA BOTLARNI AVTOMATIK YARATISH
 async function createBotsIfNotExist() {
     const defaultBots = ["Bot_Alisher", "Bot_Madina", "Bot_Jasur", "Bot_Sardor", "Bot_Farrux"];
     for (let botName of defaultBots) {
@@ -77,14 +81,12 @@ async function createBotsIfNotExist() {
 }
 createBotsIfNotExist();
 
-
-// 6. ENGL ASOSIY QISM: GAROV TIKISH VA O'YIN MANTIQI
+// 5. GAROV TIKISH VA CHIRKIDAGI ALDOV MANTIQLARI (0 soniya kutish)
 app.post('/api/place-bet', async (req, res) => {
     try {
         const { username, betAmount } = req.body;
         const parsedBet = parseInt(betAmount);
 
-        // Foydalanuvchini tekshirish
         const user = await User.findOne({ username });
         if (!user) return res.status(404).json({ success: false, message: "Foydalanuvchi topilmadi!" });
         
@@ -92,53 +94,43 @@ app.post('/api/place-bet', async (req, res) => {
             return res.status(400).json({ success: false, message: "Mablag' yetarli emas!" });
         }
 
-        // QOIDA 1: Botlar faqat 700,000 va 1,000,000 so'mlik garovlarda o'ynaydi
+        // QOIDA: Botlar faqat 700,000 va 1,000,000 so'mlik garovlarda o'ynaydi
         if (parsedBet < 700000) {
             return res.status(400).json({ success: false, message: "Raqiblar faqat 700,000 va 1,000,000 so'mlik garovlarni qabul qilishadi!" });
         }
 
-        // Tasodifiy bitta botni tanlash
         const botNames = ["Alisher", "Madina", "Jasur", "Sardor", "Farrux"];
         const randomBotName = botNames[Math.floor(Math.random() * botNames.length)];
         const bot = await Bot.findOne({ name: `Bot_${randomBotName}` });
 
         if (!bot || bot.balance < parsedBet) {
-            return res.status(400).json({ success: false, message: "Hozircha bo'sh raqib topilmadi, qayta urinib ko'ring!" });
+            return res.status(400).json({ success: false, message: "Hozircha bo'sh raqib topilmadi!" });
         }
 
-        // QOIDA 2: O'yin boshlanishi bilanoq ikkala tomondan ham pul ayiriladi
+        // Garov tikilishi bilan pullar darhol ayiriladi
         user.balance -= parsedBet;
         bot.balance -= parsedBet;
-        const totalPrize = parsedBet * 2; // O'yin jamg'armasi
+        const totalPrize = parsedBet * 2;
 
-        // O'yinlar hisoblagichini oshiramiz
         user.gameCounter += 1;
+        let userScore, botScore, gameResultText;
 
-        let userScore, botScore;
-        let gameResultText = "";
-
-        // QOIDA 3 & 4: Bot 2 marta yutib, 1 marta yutqazadi
+        // QOIDA: 2 marta bot yutadi, 1 marta foydalanuvchi yutadi
         if (user.gameCounter % 3 !== 0) {
-            // BOT YUTADI (2 marta)
-            botScore = Math.floor(Math.random() * 3) + 10; // Bot ochkosi baland (10-12)
-            userScore = Math.floor(Math.random() * 5) + 2;  // Sizning ochkongiz past (2-6)
-            
-            bot.balance += totalPrize; // Bot pulni yutib oldi
+            botScore = Math.floor(Math.random() * 3) + 10;
+            userScore = Math.floor(Math.random() * 5) + 2;
+            bot.balance += totalPrize;
             gameResultText = `G'olib: ${randomBotName}`;
         } else {
-            // SIZ YUTASIZ (1 marta)
-            userScore = Math.floor(Math.random() * 3) + 10; // Sizning ochkongiz baland (10-12)
-            botScore = Math.floor(Math.random() * 5) + 2;  // Bot ochkosi past (2-6)
-            
-            user.balance += totalPrize; // Siz pulni yutib oldingiz
+            userScore = Math.floor(Math.random() * 3) + 10;
+            botScore = Math.floor(Math.random() * 5) + 2;
+            user.balance += totalPrize;
             gameResultText = `G'olib: ${user.username}`;
         }
 
-        // Natijalarni bazada yangilash
         await user.save();
         await bot.save();
 
-        // Natijani darhol (0 soniyada) frontandga qaytarish
         res.json({
             success: true,
             opponent: randomBotName, 
@@ -150,13 +142,11 @@ app.post('/api/place-bet', async (req, res) => {
         });
 
     } catch (error) {
-        console.error(error);
         res.status(500).json({ success: false, message: "Serverda ichki xatolik yuz berdi" });
     }
 });
 
-
-// 7. ADMIN PANEL UCHUN BALANS BOSHQARISH (Depozit va Chiqarish)
+// 6. ADMIN PANEL APISALARI
 app.post('/api/admin/manage-balance', async (req, res) => {
     try {
         const { username, action, amount } = req.body;
@@ -164,7 +154,7 @@ app.post('/api/admin/manage-balance', async (req, res) => {
 
         let target = await User.findOne({ username });
         if (!target) {
-            target = await Bot.findOne({ name: username }); // Botlardan qidiradi
+            target = await Bot.findOne({ name: username });
         }
 
         if (!target) return res.status(404).json({ success: false, message: "Profil topilmadi!" });
@@ -176,15 +166,11 @@ app.post('/api/admin/manage-balance', async (req, res) => {
         }
 
         await target.save();
-        res.json({ success: true, message: "Balans muvaffaqiyatli yangilandi!", newBalance: target.balance });
+        res.json({ success: true, message: "Balans yangilandi!", newBalance: target.balance });
     } catch (error) {
         res.status(500).json({ success: false, message: "Xatolik yuz berdi" });
     }
 });
 
-
-// PORTNI ESHITISH
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server ${PORT}-portda mukammal rejimda ishlamoqda...`);
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
