@@ -6,44 +6,210 @@
     <title>Oshiqlar O'yini</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        body { background-color: #0f172a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-        .card { background: #1e293b; padding: 25px; border-radius: 16px; width: 90%; max-width: 380px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); text-align: center; }
-        .header-info { display: flex; justify-content: space-between; font-size: 14px; color: #94a3b8; margin-bottom: 15px; }
-        .balance-box { font-size: 26px; font-weight: bold; color: #10b981; margin: 10px 0; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
-        .room-btn { background: #334155; border: 2px solid transparent; color: white; padding: 15px; border-radius: 12px; font-size: 15px; font-weight: bold; cursor: pointer; }
-        .room-btn.selected { background: #10b981; box-shadow: 0 0 12px #10b981; }
-        .action-btn { background: #ef4444; color: white; border: none; width: 100%; padding: 16px; font-size: 18px; font-weight: bold; border-radius: 12px; cursor: pointer; }
-        .status-panel { margin-top: 15px; padding: 12px; background: #0f172a; border-radius: 8px; font-size: 15px; display: none; }
-        .timer { font-size: 26px; color: #ef4444; font-weight: bold; margin-top: 5px; }
+        body { 
+            background-color: #0b1120; 
+            color: #ffffff; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: flex-start; 
+            min-height: 100vh; 
+            margin: 0; 
+            padding: 20px 0;
+        }
+        .main-container {
+            width: 90%;
+            max-width: 400px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .refresh-btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 12px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .card { 
+            background: #151f32; 
+            padding: 20px; 
+            border-radius: 20px; 
+            border: 1px solid #1e293b;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4); 
+            text-align: center; 
+        }
+        .player-header {
+            font-size: 14px;
+            color: #94a3b8;
+            margin-bottom: 5px;
+        }
+        .balance-box { 
+            font-size: 28px; 
+            font-weight: 800; 
+            color: #10b981; 
+            margin-bottom: 5px; 
+        }
+        .tax-info {
+            font-size: 11px;
+            color: #eab308;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            margin-bottom: 25px;
+        }
+        .section-title {
+            text-align: left;
+            font-size: 16px;
+            font-weight: bold;
+            color: #ffffff;
+            margin-bottom: 15px;
+        }
+        .grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 12px; 
+            margin-bottom: 15px; 
+        }
+        .room-btn { 
+            background: #1e293b; 
+            border: 1px solid #334155; 
+            color: white; 
+            padding: 18px 10px; 
+            border-radius: 14px; 
+            font-size: 16px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            transition: all 0.2s ease;
+        }
+        .room-btn.selected { 
+            background: #10b981; 
+            border-color: #10b981;
+            box-shadow: 0 0 12px rgba(16, 185, 129, 0.4); 
+        }
+        .special-btn {
+            grid-column: span 2;
+            background: #1e1b4b;
+            border: 1px dashed #eab308;
+            border-radius: 14px;
+            padding: 15px;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+        .special-btn span {
+            font-size: 11px;
+            color: #94a3b8;
+            font-weight: normal;
+        }
+        .action-btn { 
+            background: #ef4444; 
+            color: white; 
+            border: none; 
+            width: 100%; 
+            padding: 16px; 
+            font-size: 16px; 
+            font-weight: bold; 
+            border-radius: 14px; 
+            cursor: pointer; 
+            margin-top: 15px;
+            text-transform: uppercase;
+        }
+        .leaderboard-card {
+            background: #151f32;
+            border-radius: 20px;
+            border: 1px solid #1e293b;
+            padding: 20px;
+        }
+        .leaderboard-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            color: #64748b;
+            font-size: 13px;
+            font-weight: bold;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #1e293b;
+            margin-bottom: 10px;
+        }
+        .user-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #1e293b;
+            font-size: 14px;
+        }
+        .user-row:last-child {
+            border-bottom: none;
+        }
+        .user-name {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .user-balance {
+            font-weight: bold;
+            color: #cbd5e1;
+        }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <div class="header-info">
-        <div>O'yinchi: <span id="lblUsername" style="color:#fbbf24; font-weight:bold;">Iz</span></div>
-        <div>Onlayn o'yinchilar: <span id="lblOnline" style="color:#10b981; font-weight:bold;">1 ta</span></div>
+<div class="main-container">
+    <button class="refresh-btn" onclick="loadUserData()">Balansni Yangilash</button>
+
+    <div class="card">
+        <div class="player-header">O'yinchi: <span id="myUsername" style="font-weight:bold; color:white;">Iz</span></div>
+        <div class="balance-box" id="lblBalance">5,000,000 UZS</div>
+        <div class="tax-info">⚡ 2% Kompaniya Solig'i faol</div>
+
+        <div class="section-title">Xonani Tanlang:</div>
+        
+        <div class="grid">
+            <button class="room-btn" onclick="selectRoom(40000, this)">40,000</button>
+            <button class="room-btn" onclick="selectRoom(100000, this)">100,000</button>
+            <button class="room-btn" onclick="selectRoom(300000, this)">300,000</button>
+            <button class="room-btn" onclick="selectRoom(700000, this)">700,000</button>
+            
+            <button class="special-btn" onclick="selectRoom(1200000, this)">
+                <div>💎 1,200,000</div>
+                <span>Faqat Odamlar</span>
+            </button>
+        </div>
+
+        <button class="action-btn" id="btnAction" onclick="startMatchmake()">Garov Tikish</button>
     </div>
 
-    <div class="balance-box" id="lblBalance">0 UZS</div>
-    <div style="font-size: 12px; color: #a1a1aa; margin-bottom: 15px;">Garov qiymati: <span id="lblWaitingBets" style="color:#fbbf24">0 UZS</span></div>
-
-    <div class="grid">
-        <button class="room-btn" onclick="selectRoom(40000, this)">40 000 UZS</button>
-        <button class="room-btn" onclick="selectRoom(100000, this)">100 000 UZS</button>
-        <button class="room-btn" onclick="selectRoom(300000, this)">300 000 UZS</button>
-        <button class="room-btn" onclick="selectRoom(700000, this)">700 000 UZS</button>
-        <button class="room-btn" onclick="selectRoom(1000000, this)">1 000 000 UZS</button>
-        <button class="room-btn" onclick="selectRoom(1200000, this)">1 200 000 UZS</button>
+    <div class="leaderboard-card">
+        <div class="leaderboard-title">🤖 Ishtirokchilar Balansi</div>
+        <div class="table-header">
+            <div>Ism / Bot</div>
+            <div>Balans</div>
+        </div>
+        <div id="leaderboardList">
+            </div>
     </div>
-
-    <div id="statusPanel" class="status-panel">
-        <div id="gameOpponent">Raqib qidirilmoqda...</div>
-        <div class="timer" id="gameTimer">20</div>
-    </div>
-
-    <button class="action-btn" id="btnAction" onclick="startMatchmake()">GAROV TIKISH</button>
 </div>
 
 <script>
@@ -52,30 +218,48 @@
     let selectedAmount = 0;
     let currentRoomId = null;
 
-    function formatMoney(num) {
-        return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " UZS";
+    function formatUZS(num) {
+        return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") + " UZS";
     }
 
     async function loadUserData() {
-        document.getElementById('lblUsername').innerText = currentUsername;
-        const res = await fetch('/api/users-list');
-        const data = await res.json();
-        if(data.success) {
-            const me = data.users.find(u => u.username === currentUsername);
-            if(me) document.getElementById('lblBalance').innerText = formatMoney(me.balance);
-        }
-    }
-    loadUserData();
+        try {
+            const res = await fetch('/api/users-list');
+            const data = await res.json();
+            if(data.success) {
+                // Shaxsiy balansni yangilash
+                const me = data.users.find(u => u.username === currentUsername);
+                if(me) {
+                    document.getElementById('lblBalance').innerText = formatUZS(me.balance);
+                }
 
-    socket.on('online-count', (data) => {
-        document.getElementById('lblOnline').innerText = data.count + " ta";
-    });
+                // Jadvalni tozalash va rasmga mos ko'rinishda yaratish
+                const listContainer = document.getElementById('leaderboardList');
+                listContainer.innerHTML = "";
+
+                data.users.forEach(user => {
+                    const isBot = user.username.toLowerCase().includes('bot') || user.username.startsWith('Muxa');
+                    const icon = isBot ? "🤖" : "👤";
+                    
+                    const row = document.createElement('div');
+                    row.className = "user-row";
+                    row.innerHTML = `
+                        <div class="user-name"><span>${icon}</span> ${user.username}</div>
+                        <div class="user-balance">${formatUZS(user.balance)}</div>
+                    `;
+                    listContainer.appendChild(row);
+                });
+            }
+        } catch (e) { console.log("Ma'lumot yuklashda xatolik"); }
+    }
+
+    // Sahifa yuklanganda ishga tushadi
+    loadUserData();
 
     function selectRoom(amount, btn) {
         selectedAmount = amount;
-        document.querySelectorAll('.room-btn').forEach(b => b.classList.remove('selected'));
+        document.querySelectorAll('.room-btn, .special-btn').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
-        document.getElementById('lblWaitingBets').innerText = formatMoney(amount);
     }
 
     async function startMatchmake() {
@@ -91,26 +275,23 @@
         if(data.success) {
             currentRoomId = data.room.roomId;
             socket.emit('join-room', currentRoomId);
-            document.getElementById('statusPanel').style.display = 'block';
             document.getElementById('btnAction').disabled = true;
-            document.getElementById('btnAction').innerText = "RAQIB KUTILMOQDA...";
+            document.getElementById('btnAction').innerText = "Raqib kutilmoqda...";
 
-            if(data.room.player2) { handleMatchStart(data.room); }
+            if(data.room.player2) { handleMatchStart(); }
         } else { alert("Mablag' yetarli emas!"); }
     }
 
-    function handleMatchStart(room) {
-        let opponent = room.player1 === currentUsername ? room.player2 : room.player1;
-        document.getElementById('gameOpponent').innerHTML = `🎮 Kim bilan o'ynayapti: <b style="color:#ef4444">${opponent}</b>`;
+    function handleMatchStart() {
         document.getElementById('btnAction').disabled = false;
         document.getElementById('btnAction').style.background = "#10b981";
-        document.getElementById('btnAction').innerText = "🎲 TOSHLARNI TASHLAH";
+        document.getElementById('btnAction').innerText = "🎲 Tosh Tashlah";
         document.getElementById('btnAction').onclick = rollDice;
     }
 
     async function rollDice() {
         document.getElementById('btnAction').disabled = true;
-        document.getElementById('btnAction').innerText = "YURILDINGIZ...";
+        document.getElementById('btnAction').innerText = "Yurildi...";
         await fetch('/api/roll-dice', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -118,15 +299,12 @@
         });
     }
 
-    socket.on('match-started', (data) => { handleMatchStart(data.room); });
-    socket.on('timer-update', (data) => { document.getElementById('gameTimer').innerText = data.timeLeft; });
-
+    socket.on('match-started', () => { handleMatchStart(); });
     socket.on('game-finished', (data) => {
         alert(data.result);
-        document.getElementById('statusPanel').style.display = 'none';
         document.getElementById('btnAction').disabled = false;
         document.getElementById('btnAction').style.background = "#ef4444";
-        document.getElementById('btnAction').innerText = "GAROV TIKISH";
+        document.getElementById('btnAction').innerText = "Garov Tikish";
         document.getElementById('btnAction').onclick = startMatchmake;
         loadUserData();
     });
