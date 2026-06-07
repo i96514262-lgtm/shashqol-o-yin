@@ -1,6 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -8,7 +9,7 @@ const app = express();
 // O'rta dasturlar (Middleware)
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public')); // Agar frontend fayllaringiz shu loyihada bo'lsa
+app.use(express.static(path.join(__dirname, 'public'))); // public papkasidagi CSS/JS fayllar uchun
 
 // 1. MONGODB'GA ULANISH
 mongoose.connect(process.env.MONGO_URI)
@@ -30,7 +31,18 @@ const botSchema = new mongoose.Schema({
 const Bot = mongoose.model('Bot', botSchema);
 
 
-// 3. FOYDALANUVCHINI TIZIMGA KIRITISH (LOGIN / REGISTER)
+// 3. ASOSIY SAHIFANI YUKLASH (Cannot GET / xatoligini oldini olish uchun)
+app.get('/', (req, res) => {
+    // Agar index.html faylingiz shundoq bosh papkada bo'lsa:
+    res.sendFile(path.join(__dirname, 'index.html'));
+    
+    // AGAR index.html faylingiz 'public' papkasi ichida bo'lsa, yuqoridagi qatorni o'chirib,
+    // pastdagi qatorni ochib qo'ying:
+    // res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+
+// 4. FOYDALANUVCHINI TIZIMGA KIRITISH (LOGIN / REGISTER)
 app.post('/api/login', async (req, res) => {
     try {
         const { username } = req.body;
@@ -38,7 +50,6 @@ app.post('/api/login', async (req, res) => {
 
         let user = await User.findOne({ username });
         if (!user) {
-            // Agar bunday ismli odam bo'lmasa, yangi ochadi
             user = new User({ username });
             await user.save();
         }
@@ -49,7 +60,7 @@ app.post('/api/login', async (req, res) => {
 });
 
 
-// 4. BAZADA BOTLARNI AVTOMATIK YARATISH (Agar bazada yo'q bo'lsa)
+// 5. BAZADA BOTLARNAVTOMATIK YARATISH (Agar bazada yo'q bo'lsa)
 async function createBotsIfNotExist() {
     const defaultBots = ["Bot_Alisher", "Bot_Madina", "Bot_Jasur", "Bot_Sardor", "Bot_Farrux"];
     for (let botName of defaultBots) {
@@ -62,7 +73,7 @@ async function createBotsIfNotExist() {
 createBotsIfNotExist();
 
 
-// 5. ENGL ASOSIY QISM: GAROV TIKISH VA O'YIN MANTIQI (0 soniya kutish va aldov algoritmi)
+// 6. ENGL ASOSIY QISM: GAROV TIKISH VA O'YIN MANTIQI (0 soniya kutish va aldov algoritmi)
 app.post('/api/place-bet', async (req, res) => {
     try {
         const { username, betAmount } = req.body;
@@ -107,14 +118,14 @@ app.post('/api/place-bet', async (req, res) => {
             botScore = Math.floor(Math.random() * 3) + 10; // Bot ochkosi baland (10-12)
             userScore = Math.floor(Math.random() * 5) + 2;  // Sizning ochkongiz past (2-6)
             
-            bot.balance += totalPrize; // Bot pulni yutib oldi, balansi ko'paydi
+            bot.balance += totalPrize; // Bot pulni yutib oldi
             gameResultText = `G'olib: ${randomBotName}`; // Foydalanuvchiga "Bot_" so'zisiz ko'rsatiladi!
         } else {
             // SIZ YUTASIZ (1 marta)
             userScore = Math.floor(Math.random() * 3) + 10; // Sizning ochkongiz baland (10-12)
             botScore = Math.floor(Math.random() * 5) + 2;  // Bot ochkosi past (2-6)
             
-            user.balance += totalPrize; // Siz pulni yutib oldingiz, balansingiz ko'paydi
+            user.balance += totalPrize; // Siz pulni yutib oldingiz
             gameResultText = `G'olib: ${user.username}`;
         }
 
@@ -140,7 +151,7 @@ app.post('/api/place-bet', async (req, res) => {
 });
 
 
-// 6. ADMIN PANEL UCHUN BALANS BOSHQARISH (Depozit va Chiqarish)
+// 7. ADMIN PANEL UCHUN BALANS BOSHQARISH (Depozit va Chiqarish)
 app.post('/api/admin/manage-balance', async (req, res) => {
     try {
         const { username, action, amount } = req.body;
@@ -170,5 +181,5 @@ app.post('/api/admin/manage-balance', async (req, res) => {
 // PORTNI ESHITISH
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`Server ${PORT}-portda daxshatli rejimda ishlamoqda...`);
+    console.log(`Server ${PORT}-portda mukammal rejimda ishlamoqda...`);
 });
