@@ -2,20 +2,22 @@
 <html lang="uz">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Oshiqlar O'yini</title>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        body { background: #111c24; color: white; font-family: sans-serif; text-align: center; padding: 20px; }
-        .btn { padding: 15px 30px; margin: 10px; background: #1a2f3d; border: 2px solid #254053; color: white; font-size: 18px; cursor: pointer; border-radius: 8px;}
-        .active { background: #2ecc71; border-color: #2ecc71; }
-        .main-btn { background: #e74c3c; width: 80%; padding: 15px; font-size: 20px; border: none; border-radius: 8px; color: white; cursor: pointer; font-weight: bold;}
+        body { background: #111c24; color: white; text-align: center; font-family: sans-serif; padding: 20px; }
+        .header { background: #1a2f3d; padding: 20px; border-radius: 10px; }
+        .btn { padding: 15px; margin: 10px; width: 40%; background: #1a2f3d; color: white; border: 1px solid #254053; border-radius: 8px; cursor: pointer; }
+        .active { background: #2ecc71; border: 1px solid #2ecc71; }
+        .main-btn { background: #e74c3c; width: 90%; padding: 20px; font-size: 20px; border: none; color: white; border-radius: 10px; cursor: pointer; }
     </style>
 </head>
 <body>
-
-    <h2>Oyinchi: <span id="user-name">Iz</span> | Balans: <span id="user-balance">5,000,000</span> so'm</h2>
-    <p>Onlayn o'yinchilar: 5 ta | Kutilmoqda: 0 ta garov</p>
+    <div class="header">
+        <h2>O'yinchi: Iz</h2>
+        <h3>Balans: <span id="user-balance">5,000,000</span> so'm</h3>
+        <p style="color: #f1c40f;">💰 2% Kompaniya Solig'i mavjud</p>
+    </div>
 
     <h3>Garov summasini tanlang:</h3>
     <button class="btn" onclick="selectBet(40000, this)">40,000</button>
@@ -26,42 +28,25 @@
 
     <br><br>
     <button class="main-btn" onclick="playGame()">GAROV TIKISH</button>
-    <h3 id="status-text" style="color: #e74c3c;"></h3>
-
+    
     <script>
         let selectedAmount = 700000;
-        let username = "Iz"; 
-
-        function selectBet(amount, element) {
-            selectedAmount = amount;
+        function selectBet(amt, el) { 
+            selectedAmount = amt; 
             document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
-            element.classList.add('active');
+            el.classList.add('active');
         }
-
         async function playGame() {
-            document.getElementById('status-text').innerText = "";
-            
-            const response = await fetch('/api/place-bet', {
+            const res = await fetch('/api/place-bet', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, betAmount: selectedAmount })
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: "Iz", betAmount: selectedAmount})
             });
-
-            const data = await response.json();
-
-            if (!data.success) {
-                document.getElementById('status-text').innerText = data.message;
-                return;
-            }
-
-            // O'yin darhol (0 soniyada) boshlanadi va raqib ismi ko'rinadi
-            Swal.fire({
-                title: `Raqib topildi: ${data.opponent}`,
-                html: `Sizning ochkongiz: <b>${data.userScore}</b><br>Raqib ochkosi: <b>${data.botScore}</b><br><br><h3>${data.result}</h3>`,
-                icon: 'info'
-            });
-
-            document.getElementById('user-balance').innerText = data.userBalance.toLocaleString();
+            const data = await res.json();
+            if(data.success) {
+                document.getElementById('user-balance').innerText = data.userBalance.toLocaleString();
+                Swal.fire(data.opponent, data.result);
+            } else { alert(data.message); }
         }
     </script>
 </body>
