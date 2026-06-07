@@ -50,7 +50,7 @@ async function baziInitsializatsiya() {
     console.log("Botlar va Bank sozlandi!");
 }
 
-// Botlarning o'zaro o'yini (Kassa muvozanati uchun)
+// Botlarning o'zaro o'yini (Kassa barqarorligi uchun)
 setInterval(async () => {
     try {
         const bots = await Bot.find({});
@@ -64,10 +64,10 @@ setInterval(async () => {
         let winner = Math.random() > 0.5 ? b1 : b2;
         winner.balance += (bet * 2);
         await b1.save(); await b2.save();
-    } catch (e) { console.log("Bot-bot jang xatosi"); }
+    } catch (e) { console.log("Bot-bot o'yin xatosi"); }
 }, 6000);
 
-// Real-time o'yin taymerlari va xonalar nazorati
+// Real-time taymer (Teskari sanoq nazorati)
 setInterval(() => {
     activeRooms.forEach(async (room, index) => {
         if (room.status === 'playing') {
@@ -75,11 +75,10 @@ setInterval(() => {
             io.to(room.roomId).emit('timer-update', { timeLeft: room.timeLeft });
 
             if (room.timeLeft <= 0) {
-                // Vaqt tugaganda yurmagan yutqazadi
                 let winnerName = null, loserName = null;
                 if (!room.p1Rolled && room.p2Rolled) { winnerName = room.player2; loserName = room.player1; }
                 else if (room.p1Rolled && !room.p2Rolled) { winnerName = room.player1; loserName = room.player2; }
-                else { winnerName = room.player1; loserName = room.player2; } // Ikkalasi ham yurmasa p1 g'olib
+                else { winnerName = room.player1; loserName = room.player2; }
 
                 await handleTimeoutWin(winnerName, loserName, room.betAmount, room.roomId);
                 activeRooms.splice(index, 1);
@@ -103,11 +102,11 @@ async function handleTimeoutWin(wName, lName, amount, roomId) {
         winnerObj.balance += totalPrize;
     }
     await winnerObj.save();
-    await new History({ match: `${wName} vs ${lName} (Timeout)`, amount, winner: wName }).save();
-    io.to(roomId).emit('game-finished', { result: `G'olib (Timeout): ${wName}`, winner: wName });
+    await new History({ match: `${wName} vs ${lName} (Vaqt tugadi)`, amount, winner: wName }).save();
+    io.to(roomId).emit('game-finished', { result: `G'olib (Vaqt tugadi): ${wName}`, winner: wName });
 }
 
-// WEB SOCKETS INTEGRATSIYASI
+// JONLI ALOQA (SOCKET.IO SHYETDA)
 io.on('connection', (socket) => {
     onlineUsersCount++;
     io.emit('online-count', { count: onlineUsersCount });
@@ -117,7 +116,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        onlineUsersCount--;
+        if (onlineUsersCount > 0) onlineUsersCount--;
         io.emit('online-count', { count: onlineUsersCount });
     });
 });
@@ -150,7 +149,7 @@ app.post('/api/matchmake', async (req, res) => {
         await user.save();
         activeRooms.push(newRoom);
 
-        if (betAmount !== 1200000) { // 1.2M dan tashqari xonalarda 3 soniyadan keyin Muxa bot kiradi
+        if (betAmount !== 1200000) { 
             setTimeout(async () => {
                 let currentRoom = activeRooms.find(r => r.roomId === roomId);
                 if (currentRoom && !currentRoom.player2) {
@@ -164,12 +163,11 @@ app.post('/api/matchmake', async (req, res) => {
                 }
             }, 3000);
         }
-
         return res.json({ success: true, room: newRoom });
     }
 });
 
-// API: DICE ROLL & ALGORITHM
+// API: TOSH TASHLAH VA 2 TA BOT 1 TA ODAM YUTISH FOIZI
 app.post('/api/roll-dice', async (req, res) => {
     const { roomId, username } = req.body;
     let room = activeRooms.find(r => r.roomId === roomId);
@@ -188,7 +186,7 @@ app.post('/api/roll-dice', async (req, res) => {
         let p2User = p2Bot ? await Bot.findOne({ name: room.player2 }) : await User.findOne({ username: room.player2 });
         let bank = await Bank.findOne();
 
-        // 🎯 2 marta Bot, 1 marta Odam yutish qat'iy foiz algoritmi
+        // 🎯 2 marta Bot yutib, 1 marta Odam yutish algoritmi
         if (p2Bot && !p1Bot) {
             p1User.gameCounter += 1;
             if (p1User.gameCounter % 3 !== 0) { room.p2Score = 6; room.p1Score = Math.floor(Math.random() * 5) + 1; } 
@@ -209,7 +207,7 @@ app.post('/api/roll-dice', async (req, res) => {
             await p1User.save(); await p2User.save();
             activeRooms = activeRooms.filter(r => r.roomId !== room.roomId);
             io.to(room.roomId).emit('game-finished', { result: "Durang!", scores: { p1: room.p1Score, p2: room.p2Score } });
-            return res.json({ success: true, draw: true });
+            return res.json({ success: true });
         }
 
         let totalPrize = room.betAmount * 2;
@@ -234,15 +232,14 @@ app.post('/api/roll-dice', async (req, res) => {
     }
 
     io.to(room.roomId).emit('player-rolled', { username });
-    res.json({ success: true, waiting: true });
+    res.json({ success: true });
 });
 
-// Admin APIlar eski holatda qoladi...
 app.get('/api/users-list', async (req, res) => {
-    res.json({ success: true, users: await User.find({}), bots: await Bot.find({}), bank: await Bank.findOne() || {}, history: await History.find().sort({ time: -1 }).limit(10) });
+    res.json({ success: true, users: await User.find({}), bots: await Bot.find({}), bank: await Bank.findOne() || {} });
 });
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/admin-panel', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 
-server.listen(process.env.PORT || 3000, () => console.log('Server va Sockets yuklandi!'));
+server.listen(process.env.PORT || 3000, () => console.log('Ishga tushdi!'));
