@@ -4,34 +4,35 @@
     <meta charset="UTF-8">
     <title>Admin Panel</title>
     <style>
-        body { background: #151d2a; color: white; padding: 20px; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { border: 1px solid #2c3e50; padding: 10px; }
-        input, select, button { width: 100%; padding: 10px; margin: 5px 0; }
+        body { background: #0f172a; color: white; padding: 20px; }
+        .tax-box { background: #0ea5e9; padding: 20px; border-radius: 12px; margin-bottom: 20px; text-align: center; }
+        table { width: 100%; border-collapse: collapse; background: #1e293b; border-radius: 10px; overflow: hidden; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
+        button { padding: 10px 20px; cursor: pointer; border-radius: 8px; border: none; }
+        .transfer-btn { background: #f59e0b; color: #000; font-weight: bold; width: 100%; margin-top: 10px; }
     </style>
 </head>
 <body>
-    <h3>Foydalanuvchilar va Botlar</h3>
+    <div class="tax-box">
+        <h3>To'plangan Soliq: <span id="tax-amount">0</span> UZS</h3>
+        <button class="transfer-btn" onclick="transferTax()">💰 SOLIQNI BANKKA O'TKAZISH</button>
+    </div>
+    
+    <h3>Balanslar</h3>
     <table id="table"></table>
-    <hr>
-    <h3>Balans Boshqarish</h3>
-    <input type="text" id="user" placeholder="Ism...">
-    <select id="action"><option value="add">Qo'shish</option><option value="withdraw">Yechish</option></select>
-    <input type="number" id="amt" placeholder="Summa...">
-    <button onclick="manage()">AMALNI BAJARISH</button>
 
     <script>
         async function load() {
             const res = await fetch('/api/users-list');
             const data = await res.json();
+            document.getElementById('tax-amount').innerText = data.bank.accumulatedTax.toLocaleString();
             let html = '<tr><th>Ism</th><th>Balans</th></tr>';
             data.bots.forEach(b => html += `<tr><td>${b.name}</td><td>${b.balance}</td></tr>`);
             data.users.forEach(u => html += `<tr><td>${u.username}</td><td>${u.balance}</td></tr>`);
             document.getElementById('table').innerHTML = html;
         }
-        async function manage() {
-            const body = {username: document.getElementById('user').value, action: document.getElementById('action').value, amount: document.getElementById('amt').value};
-            await fetch('/api/admin/manage-balance', {method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+        async function transferTax() {
+            await fetch('/api/admin/transfer-tax', {method: 'POST'});
             load();
         }
         load();
