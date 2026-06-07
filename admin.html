@@ -7,54 +7,43 @@
     <style>
         body { background: #0f172a; color: white; font-family: sans-serif; padding: 20px; margin: 0; }
         .card { background: #1e293b; padding: 25px; border-radius: 16px; margin-bottom: 25px; border: 1px solid #334155; }
-        
-        /* Soliq qismi */
-        .tax-title { font-size: 20px; margin: 0; }
-        .tax-amount { color: #eab308; font-weight: bold; }
-        .bank-btn { background: #0ea5e9; color: white; padding: 12px 20px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-
-        /* Jadval qismi */
+        .bank-container { background: #0ea5e9; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3); }
+        .bank-title { font-size: 16px; text-transform: uppercase; letter-spacing: 1px; }
+        .bank-values { font-size: 24px; font-weight: bold; margin: 10px 0; }
+        .bank-btn { width: 100%; background: #eab308; color: #000; padding: 15px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { padding: 15px; border-bottom: 1px solid #334155; text-align: left; font-size: 15px; }
-        th { color: #94a3b8; }
-        .live-tag { color: #10b981; font-weight: bold; }
-
-        /* Balans boshqarish qismi */
+        th, td { padding: 15px; border-bottom: 1px solid #334155; text-align: left; }
         .input-group { display: flex; flex-direction: column; gap: 12px; margin-top: 15px; }
         input, select { padding: 15px; background: #0f172a; border: 1px solid #334155; color: white; border-radius: 10px; font-size: 16px; }
-        .action-btn { background: #f43f5e; color: white; padding: 18px; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; text-transform: uppercase; }
-        .action-btn:active { transform: scale(0.98); }
+        .action-btn { background: #f43f5e; color: white; padding: 18px; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
     </style>
 </head>
 <body>
 
-    <div class="card">
-        <h2 class="tax-title">To'plangan Kompaniya Solig'i: <span id="tax" class="tax-amount">0</span> UZS</h2>
-        <button class="bank-btn" onclick="clearTax()">Soliqni Bankka O'tkazish</button>
+    <div class="bank-container">
+        <div class="bank-title">🏛️ O'yinning Asosiy Bank Fondi</div>
+        <div class="bank-values"><span id="main-bank">100,000,000</span> UZS</div>
+        <div style="font-size: 14px; margin-bottom: 5px;">Garovlardan yig'ilgan soliq: <span id="tax-amount" style="font-weight: bold;">0</span> UZS</div>
+        <button class="bank-btn" onclick="transferTaxToBank()">💰 Soliqni Bankka O'tkazish</button>
     </div>
+    <br>
 
-    <!-- PULLARNI BOSHQARISH TIZIMI -->
     <div class="card">
-        <h3>💰 Balans Boshqarish (Kassa)</h3>
+        <h3>💰 Kassa boshqaruvi (Balans tahrirlash)</h3>
         <div class="input-group">
-            <input type="text" id="target-user" placeholder="Foydalanuvchi yoki Bot ismi... (Masalan: Iz yoki Bot_Alisher)">
+            <input type="text" id="target-user" placeholder="Ism yoki Bot nomi (Masalan: Iz yoki Bot_Alisher)">
             <select id="balance-action">
                 <option value="add">Pul qo'shish (+)</option>
                 <option value="remove">Pul yechib olish (-)</option>
             </select>
-            <input type="number" id="balance-amount" placeholder="Summa... (Masalan: 500000)">
-            <button class="action-btn" onclick="executeBalanceChange()">Amalni Bajarish</button>
+            <input type="number" id="balance-amount" placeholder="Summa miqdori...">
+            <button class="action-btn" onclick="executeBalanceChange()">Balansni Yangilash</button>
         </div>
     </div>
 
     <div class="card">
-        <h3>🤖 Botlar va Odamlar Balansi (<span class="live-tag">Jonli 24/7</span>)</h3>
+        <h3>🤖 Ishtirokchilar Balansi</h3>
         <table id="balance-table"></table>
-    </div>
-
-    <div class="card">
-        <h3>📜 Jonli o'yinlar tarixi:</h3>
-        <ul id="history-log" style="list-style: none; padding: 0; line-height: 1.8;"></ul>
     </div>
 
     <script>
@@ -62,18 +51,22 @@
             try {
                 const res = await fetch('/api/users-list');
                 const data = await res.json();
+                
+                document.getElementById('main-bank').innerText = data.bank.totalBalance.toLocaleString();
+                document.getElementById('tax-amount').innerText = data.bank.accumulatedTax.toLocaleString();
 
-                document.getElementById('tax').innerText = data.bank.accumulatedTax.toLocaleString();
-
-                let tbl = '<tr><th>Ism/Bot</th><th>Balans</th></tr>';
+                let tbl = '<tr><th>Ism / Bot</th><th>Balans</th></tr>';
                 data.bots.forEach(b => tbl += `<tr><td>🤖 ${b.name}</td><td>${b.balance.toLocaleString()} UZS</td></tr>`);
                 data.users.forEach(u => tbl += `<tr><td>👤 ${u.username}</td><td>${u.balance.toLocaleString()} UZS</td></tr>`);
                 document.getElementById('balance-table').innerHTML = tbl;
+            } catch (e) { console.error("Xatolik"); }
+        }
 
-                let hist = '';
-                data.history.forEach(h => hist += `<li>🕒 ${new Date(h.time).toLocaleTimeString()} -> <b>${h.match}</b> | Garov: ${h.amount.toLocaleString()} | G'olib: <span style="color:#10b981">${h.winner}</span></li>`);
-                document.getElementById('history-log').innerHTML = hist;
-            } catch (e) { console.error("Yangilashda xatolik"); }
+        async function transferTaxToBank() {
+            const res = await fetch('/api/admin/clear-tax', { method: 'POST' });
+            const data = await res.json();
+            alert(data.message);
+            updateDashboard();
         }
 
         async function executeBalanceChange() {
@@ -81,7 +74,7 @@
             const action = document.getElementById('balance-action').value;
             const amount = document.getElementById('balance-amount').value;
 
-            if(!name || !amount) return alert("Hamma maydonlarni to'ldiring!");
+            if(!name || !amount) return alert("Hamma joyni to'ldiring!");
 
             const res = await fetch('/api/admin/change-balance', {
                 method: 'POST',
@@ -89,21 +82,12 @@
                 body: JSON.stringify({ name, action, amount: parseInt(amount) })
             });
             const data = await res.json();
-            
             if(data.success) {
                 alert("Muvaffaqiyatli bajarildi!");
                 document.getElementById('target-user').value = '';
                 document.getElementById('balance-amount').value = '';
                 updateDashboard();
-            } else {
-                alert(data.message);
-            }
-        }
-
-        async function clearTax() {
-            await fetch('/api/admin/clear-tax', { method: 'POST' });
-            alert("Soliqlar muvaffaqiyatli nolga tushirildi!");
-            updateDashboard();
+            } else { alert("Xato kiritildi!"); }
         }
 
         setInterval(updateDashboard, 2000);
