@@ -2,69 +2,39 @@
 <html lang="uz">
 <head>
     <meta charset="UTF-8">
-    <title>Admin Panel - Balans Boshqarish</title>
+    <title>Admin Panel</title>
     <style>
-        body { background: #151d2a; color: white; font-family: sans-serif; padding: 20px; }
-        .box { background: #1f293d; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ff4757; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { padding: 10px; border: 1px solid #2c3e50; text-align: left; }
-        input, select, button { width: 100%; padding: 10px; margin: 5px 0; border-radius: 5px; border: none; }
-        button { background: #ff4757; color: white; font-weight: bold; cursor: pointer; }
+        body { background: #151d2a; color: white; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #2c3e50; padding: 10px; }
+        input, select, button { width: 100%; padding: 10px; margin: 5px 0; }
     </style>
 </head>
 <body>
-
-    <div class="box">
-        <h3>Foydalanuvchilar Balansi:</h3>
-        <table id="balance-table">
-            <tr><th>Foydalanuvchi / Bot</th><th>Balans</th></tr>
-        </table>
-    </div>
-
-    <div class="box">
-        <h3>Balans Boshqarish:</h3>
-        <input type="text" id="target-user" placeholder="Ism kiriting (Masalan: Iz yoki Bot_Alisher)">
-        <select id="action-type">
-            <option value="add">Pul qo'shish (Depozit)</option>
-            <option value="withdraw">Pul yechib olish (- Admin Bankka)</option>
-        </select>
-        <input type="number" id="amount" placeholder="Summa kiriting">
-        <button onclick="manageBalance()">AMALNI BAJARISH</button>
-    </div>
+    <h3>Foydalanuvchilar va Botlar</h3>
+    <table id="table"></table>
+    <hr>
+    <h3>Balans Boshqarish</h3>
+    <input type="text" id="user" placeholder="Ism...">
+    <select id="action"><option value="add">Qo'shish</option><option value="withdraw">Yechish</option></select>
+    <input type="number" id="amt" placeholder="Summa...">
+    <button onclick="manage()">AMALNI BAJARISH</button>
 
     <script>
-        async function loadBalances() {
+        async function load() {
             const res = await fetch('/api/users-list');
             const data = await res.json();
-            if(data.success) {
-                const table = document.getElementById('balance-table');
-                table.innerHTML = `<tr><th>Foydalanuvchi / Bot</th><th>Balans</th></tr>`;
-                
-                data.bots.forEach(b => {
-                    table.innerHTML += `<tr><td>${b.name} 🤖</td><td>${b.balance.toLocaleString()} UZS</td></tr>`;
-                });
-                data.users.forEach(u => {
-                    table.innerHTML += `<tr><td>${u.username}</td><td>${u.balance.toLocaleString()} UZS</td></tr>`;
-                });
-            }
+            let html = '<tr><th>Ism</th><th>Balans</th></tr>';
+            data.bots.forEach(b => html += `<tr><td>${b.name}</td><td>${b.balance}</td></tr>`);
+            data.users.forEach(u => html += `<tr><td>${u.username}</td><td>${u.balance}</td></tr>`);
+            document.getElementById('table').innerHTML = html;
         }
-
-        async function manageBalance() {
-            const username = document.getElementById('target-user').value;
-            const action = document.getElementById('action-type').value;
-            const amount = document.getElementById('amount').value;
-
-            const res = await fetch('/api/admin/manage-balance', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, action, amount })
-            });
-            const data = await res.json();
-            alert(data.message);
-            loadBalances();
+        async function manage() {
+            const body = {username: document.getElementById('user').value, action: document.getElementById('action').value, amount: document.getElementById('amt').value};
+            await fetch('/api/admin/manage-balance', {method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+            load();
         }
-
-        loadBalances();
+        load();
     </script>
 </body>
 </html>
