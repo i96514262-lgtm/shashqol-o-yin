@@ -2,39 +2,33 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+const http = require('http');
+const { Server } = require('socket.io');
 require('dotenv').config();
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, { cors: { origin: "*" } });
+
 app.use(cors());
 app.use(express.json());
 
 mongoose.connect(process.env.MONGO_URI)
   .then(async () => {
       console.log('MongoDB muvaffaqiyatli ulandi!');
-      await baziInitsializatsiya(); // Baza sozlamalarini to'g'rilash
+      await baziInitsializatsiya();
   })
   .catch(err => console.error('Baza ulanishida xatolik:', err));
 
-// SCHEMAS
+// DB SCHEMAS
 const UserSchema = new mongoose.Schema({ 
     username: String, 
     balance: { type: Number, default: 5000000 }, 
     gameCounter: { type: Number, default: 0 } 
 });
-const BotSchema = new mongoose.Schema({ 
-    name: String, 
-    balance: { type: Number, default: 20000000 } 
-});
-const BankSchema = new mongoose.Schema({ 
-    totalBalance: { type: Number, default: 100000000 }, 
-    accumulatedTax: { type: Number, default: 0 } 
-});
-const HistorySchema = new mongoose.Schema({ 
-    match: String, 
-    amount: Number, 
-    winner: String, 
-    time: { type: Date, default: Date.now } 
-});
+const BotSchema = new mongoose.Schema({ name: String, balance: { type: Number, default: 20000000 } });
+const BankSchema = new mongoose.Schema({ totalBalance: { type: Number, default: 100000000 }, accumulatedTax: { type: Number, default: 0 } });
+const HistorySchema = new mongoose.Schema({ match: String, amount: Number, winner: String, time: { type: Date, default: Date.now } });
 
 const User = mongoose.model('User', UserSchema);
 const Bot = mongoose.model('Bot', BotSchema);
@@ -42,95 +36,96 @@ const Bank = mongoose.model('Bank', BankSchema);
 const History = mongoose.model('History', HistorySchema);
 
 let activeRooms = [];
+let onlineUsersCount = 0;
 
-// ⚙️ BAZANI TOZALASH VA FAQAT 3 TA BOTNI SAQLASH FUNKSIYASI
 async function baziInitsializatsiya() {
-    // 1. Odamlar ro'yxatidan tasodifan ochilib qolgan barcha soxta "Bot_" ismlarni o'chirish
-    await User.deleteMany({ username: { $regex: /bot/i } });
-    
-    // 2. Eski botlarni tozalab, faqat siz aytgan 3 ta botni yaratish
+    await User.deleteMany({ username: { $regex: /bot|muxa/i } });
     await Bot.deleteMany({});
     const fixedBots = ['Muxa 1', 'Muxa 2', 'Muxa 3'];
     for (let botName of fixedBots) {
         await new Bot({ name: botName, balance: 20000000 }).save();
     }
-    
-    // 3. Bank tizimini tekshirish
     let bank = await Bank.findOne();
-    if (!bank) {
-        await new Bank({ totalBalance: 100000000, accumulatedTax: 0 }).save();
-    }
-    console.log("Bazadagi botlar va tizim muvaffaqiyatli optimizatsiya qilindi!");
+    if (!bank) await new Bank({ totalBalance: 100000000, accumulatedTax: 0 }).save();
+    console.log("Botlar va Bank sozlandi!");
 }
 
-// 🤖 BOTLARNING 24/7 O'ZARO O'YINI (BALANS KO'PAYMAYDI - DOIMIY TURADI)
+// Botlarning o'zaro o'yini (Kassa muvozanati uchun)
 setInterval(async () => {
     try {
         const bots = await Bot.find({});
         if (bots.length < 2) return;
-
         let b1 = bots[Math.floor(Math.random() * bots.length)];
         let b2 = bots[Math.floor(Math.random() * bots.length)];
-        while (b1.name === b2.name) { 
-            b2 = bots[Math.floor(Math.random() * bots.length)]; 
-        }
-
+        while (b1.name === b2.name) { b2 = bots[Math.floor(Math.random() * bots.length)]; }
         const amounts = [40000, 100000, 300000, 700000, 1000000];
-        let randomAmount = amounts[Math.floor(Math.random() * amounts.length)];
-
-        // Botlar o'zaro o'ynaganda kassa shishib ketmasligi uchun teng taqsimlanadi
-        b1.balance -= randomAmount;
-        b2.balance -= randomAmount;
-
+        let bet = amounts[Math.floor(Math.random() * amounts.length)];
+        b1.balance -= bet; b2.balance -= bet;
         let winner = Math.random() > 0.5 ? b1 : b2;
-        winner.balance += (randomAmount * 2); // Pullar ko'paymaydi, o'z holicha qaytadi
-        
-        await b1.save();
-        await b2.save();
-    } catch (e) { console.log("Botlar o'yinida xatolik"); }
-}, 5000);
+        winner.balance += (bet * 2);
+        await b1.save(); await b2.save();
+    } catch (e) { console.log("Bot-bot jang xatosi"); }
+}, 6000);
 
-// ⏳ 20 SONIYALIK TAYMER NAZORATI
-setInterval(async () => {
-    let now = Date.now();
+// Real-time o'yin taymerlari va xonalar nazorati
+setInterval(() => {
     activeRooms.forEach(async (room, index) => {
-        if (room.status === 'playing' && (now - room.lastActionTime > 20000)) {
-            if (!room.p1Rolled && room.p2Rolled) {
-                await handleTimeoutWin(room.player2, room.player1, room.betAmount);
-            } else if (room.p1Rolled && !room.p2Rolled) {
-                await handleTimeoutWin(room.player1, room.player2, room.betAmount);
+        if (room.status === 'playing') {
+            room.timeLeft -= 1;
+            io.to(room.roomId).emit('timer-update', { timeLeft: room.timeLeft });
+
+            if (room.timeLeft <= 0) {
+                // Vaqt tugaganda yurmagan yutqazadi
+                let winnerName = null, loserName = null;
+                if (!room.p1Rolled && room.p2Rolled) { winnerName = room.player2; loserName = room.player1; }
+                else if (room.p1Rolled && !room.p2Rolled) { winnerName = room.player1; loserName = room.player2; }
+                else { winnerName = room.player1; loserName = room.player2; } // Ikkalasi ham yurmasa p1 g'olib
+
+                await handleTimeoutWin(winnerName, loserName, room.betAmount, room.roomId);
+                activeRooms.splice(index, 1);
             }
-            activeRooms.splice(index, 1);
         }
     });
-}, 2000);
+}, 1000);
 
-async function handleTimeoutWin(winnerName, loserName, amount) {
-    let isWinnerBot = winnerName.startsWith('Muxa');
-    let uWin = isWinnerBot ? await Bot.findOne({ name: winnerName }) : await User.findOne({ username: winnerName });
+async function handleTimeoutWin(wName, lName, amount, roomId) {
+    let isWBot = wName.startsWith('Muxa');
+    let winnerObj = isWBot ? await Bot.findOne({ name: wName }) : await User.findOne({ username: wName });
+    if (!winnerObj) return;
 
-    if (!uWin) return;
-
-    if (isWinnerBot) {
-        uWin.balance += (amount * 2);
-    } else {
-        let totalPrize = amount * 2;
+    let totalPrize = amount * 2;
+    if (!isWBot) {
         let tax = Math.floor(totalPrize * 0.02);
-        uWin.balance += (totalPrize - tax);
-
+        winnerObj.balance += (totalPrize - tax);
         let bank = await Bank.findOne();
-        bank.accumulatedTax += tax;
-        await bank.save();
+        bank.accumulatedTax += tax; await bank.save();
+    } else {
+        winnerObj.balance += totalPrize;
     }
-    await uWin.save();
-    await new History({ match: `${winnerName} vs ${loserName} (Timeout)`, amount, winner: winnerName }).save();
+    await winnerObj.save();
+    await new History({ match: `${wName} vs ${lName} (Timeout)`, amount, winner: wName }).save();
+    io.to(roomId).emit('game-finished', { result: `G'olib (Timeout): ${wName}`, winner: wName });
 }
 
-// 🕹️ API: MATCHMAKING
+// WEB SOCKETS INTEGRATSIYASI
+io.on('connection', (socket) => {
+    onlineUsersCount++;
+    io.emit('online-count', { count: onlineUsersCount });
+
+    socket.on('join-room', (roomId) => {
+        socket.join(roomId);
+    });
+
+    socket.on('disconnect', () => {
+        onlineUsersCount--;
+        io.emit('online-count', { count: onlineUsersCount });
+    });
+});
+
+// API: MATCHMAKING
 app.post('/api/matchmake', async (req, res) => {
     const { username, betAmount } = req.body;
-    let isBot = username.startsWith('Muxa');
-    let user = isBot ? await Bot.findOne({ name: username }) : await User.findOne({ username });
+    let user = await User.findOne({ username });
 
     if (!user || user.balance < betAmount) {
         return res.status(400).json({ success: false, message: "Mablag' yetarli emas!" });
@@ -141,160 +136,113 @@ app.post('/api/matchmake', async (req, res) => {
     if (room) {
         room.player2 = username;
         room.status = 'playing';
-        room.lastActionTime = Date.now();
+        room.timeLeft = 20;
         user.balance -= betAmount;
         await user.save();
+
+        io.to(room.roomId).emit('match-started', { room });
         return res.json({ success: true, room });
     } else {
-        if (betAmount === 1200000) { // 1.2M xonada faqat odam odamni kutadi
-            let newRoom = { roomId: Date.now(), betAmount, player1: username, player2: null, status: 'waiting', lastActionTime: Date.now(), p1Rolled: false, p2Rolled: false };
-            user.balance -= betAmount;
-            await user.save();
-            activeRooms.push(newRoom);
-            return res.json({ success: true, room: newRoom });
-        }
-
-        // Boshqa xonalarda 3 soniyada Muxa botlaridan biri ulanadi
-        let newRoom = { roomId: Date.now(), betAmount, player1: username, player2: null, status: 'waiting', lastActionTime: Date.now(), p1Rolled: false, p2Rolled: false };
+        let roomId = "room_" + Date.now();
+        let newRoom = { roomId, betAmount, player1: username, player2: null, status: 'waiting', timeLeft: 20, p1Rolled: false, p2Rolled: false };
+        
         user.balance -= betAmount;
         await user.save();
-        
-        setTimeout(async () => {
-            let currentRoom = activeRooms.find(r => r.roomId === newRoom.roomId);
-            if (currentRoom && !currentRoom.player2) {
-                const bots = await Bot.find({});
-                let randomBot = bots[Math.floor(Math.random() * bots.length)];
-                currentRoom.player2 = randomBot.name;
-                currentRoom.status = 'playing';
-                currentRoom.lastActionTime = Date.now();
-                randomBot.balance -= betAmount;
-                await randomBot.save();
-            }
-        }, 3000);
-
         activeRooms.push(newRoom);
+
+        if (betAmount !== 1200000) { // 1.2M dan tashqari xonalarda 3 soniyadan keyin Muxa bot kiradi
+            setTimeout(async () => {
+                let currentRoom = activeRooms.find(r => r.roomId === roomId);
+                if (currentRoom && !currentRoom.player2) {
+                    const bots = await Bot.find({});
+                    let rBot = bots[Math.floor(Math.random() * bots.length)];
+                    currentRoom.player2 = rBot.name;
+                    currentRoom.status = 'playing';
+                    rBot.balance -= betAmount;
+                    await rBot.save();
+                    io.to(roomId).emit('match-started', { room: currentRoom });
+                }
+            }, 3000);
+        }
+
         return res.json({ success: true, room: newRoom });
     }
 });
 
-// 🎲 API: TOSH TASHLAH VA INTEGRATSIYALASHGAN FOIZ ALGORITMI
+// API: DICE ROLL & ALGORITHM
 app.post('/api/roll-dice', async (req, res) => {
     const { roomId, username } = req.body;
-    let room = activeRooms.find(r => r.roomId === parseInt(roomId));
+    let room = activeRooms.find(r => r.roomId === roomId);
 
     if (!room) return res.status(404).json({ success: false, message: "O'yin topilmadi" });
 
     let score = Math.floor(Math.random() * 6) + 1;
-
     if (room.player1 === username) { room.p1Score = score; room.p1Rolled = true; } 
     else if (room.player2 === username) { room.p2Score = score; room.p2Rolled = true; }
 
-    room.lastActionTime = Date.now();
-
     if (room.p1Rolled && room.p2Rolled) {
-        let p1IsBot = room.player1.startsWith('Muxa');
-        let p2IsBot = room.player2.startsWith('Muxa');
+        let p1Bot = room.player1.startsWith('Muxa');
+        let p2Bot = room.player2.startsWith('Muxa');
 
-        let p1User = p1IsBot ? await Bot.findOne({ name: room.player1 }) : await User.findOne({ username: room.player1 });
-        let p2User = p2IsBot ? await Bot.findOne({ name: room.player2 }) : await User.findOne({ username: room.player2 });
+        let p1User = p1Bot ? await Bot.findOne({ name: room.player1 }) : await User.findOne({ username: room.player1 });
+        let p2User = p2Bot ? await Bot.findOne({ name: room.player2 }) : await User.findOne({ username: room.player2 });
         let bank = await Bank.findOne();
 
-        // 🎯 MATEMATIK QAT'IY ALGORITM: 2 marta Bot yutadi, 1 marta Odam yutadi
-        if (p2IsBot && !p1IsBot) { // player1 - Haqiqiy odam, player2 - Bot
+        // 🎯 2 marta Bot, 1 marta Odam yutish qat'iy foiz algoritmi
+        if (p2Bot && !p1Bot) {
             p1User.gameCounter += 1;
-            if (p1User.gameCounter % 3 !== 0) { 
-                room.p2Score = 6; room.p1Score = Math.floor(Math.random() * 5) + 1; 
-            } else { 
-                room.p1Score = 6; room.p2Score = Math.floor(Math.random() * 5) + 1; 
-            }
+            if (p1User.gameCounter % 3 !== 0) { room.p2Score = 6; room.p1Score = Math.floor(Math.random() * 5) + 1; } 
+            else { room.p1Score = 6; room.p2Score = Math.floor(Math.random() * 5) + 1; }
             await p1User.save();
-        } else if (p1IsBot && !p2IsBot) { // player2 - Haqiqiy odam, player1 - Bot
+        } else if (p1Bot && !p2Bot) {
             p2User.gameCounter += 1;
-            if (p2User.gameCounter % 3 !== 0) { 
-                room.p1Score = 6; room.p2Score = Math.floor(Math.random() * 5) + 1; 
-            } else { 
-                room.p2Score = 6; room.p1Score = Math.floor(Math.random() * 5) + 1; 
-            }
+            if (p2User.gameCounter % 3 !== 0) { room.p1Score = 6; room.p2Score = Math.floor(Math.random() * 5) + 1; } 
+            else { room.p2Score = 6; room.p1Score = Math.floor(Math.random() * 5) + 1; }
             await p2User.save();
         }
 
-        let winner, loser, winnerIsBot;
-        if (room.p1Score > room.p2Score) {
-            winner = p1User; loser = p2User; winnerIsBot = p1IsBot;
-        } else if (room.p2Score > room.p1Score) {
-            winner = p2User; loser = p1User; winnerIsBot = p2IsBot;
-        } else { // Durang bo'lsa
+        let winner, loser, wIsBot;
+        if (room.p1Score > room.p2Score) { winner = p1User; loser = p2User; wIsBot = p1Bot; } 
+        else if (room.p2Score > room.p1Score) { winner = p2User; loser = p1User; wIsBot = p2Bot; } 
+        else {
             p1User.balance += room.betAmount; p2User.balance += room.betAmount;
             await p1User.save(); await p2User.save();
             activeRooms = activeRooms.filter(r => r.roomId !== room.roomId);
-            return res.json({ success: true, result: "Durang!", scores: { p1: room.p1Score, p2: room.p2Score } });
+            io.to(room.roomId).emit('game-finished', { result: "Durang!", scores: { p1: room.p1Score, p2: room.p2Score } });
+            return res.json({ success: true, draw: true });
         }
 
         let totalPrize = room.betAmount * 2;
-        
-        if (!winnerIsBot) { // Odam yutganida 2% soliq olinadi va bazaga yoziladi
+        if (!wIsBot) {
             let tax = Math.floor(totalPrize * 0.02);
             winner.balance += (totalPrize - tax);
             bank.accumulatedTax += tax;
-        } else { // Bot yutsa soliq olinmaydi, pul unga to'liq o'tadi
+        } else {
             winner.balance += totalPrize;
         }
 
-        await winner.save();
-        await loser.save();
-        await bank.save();
-
+        await winner.save(); await loser.save(); await bank.save();
         await new History({ match: `${room.player1} vs ${room.player2}`, amount: room.betAmount, winner: winner.name || winner.username }).save();
-        
-        let finalResult = {
-            success: true,
-            result: `G'olib: ${room.p1Score > room.p2Score ? room.player1 : room.player2}`,
-            scores: { p1: room.p1Score, p2: room.p2Score },
-            myBalance: username === (room.p1Score > room.p2Score ? room.player1 : room.player2) ? winner.balance : loser.balance
-        };
+
+        io.to(room.roomId).emit('game-finished', { 
+            result: `G'olib: ${room.p1Score > room.p2Score ? room.player1 : room.player2}`, 
+            scores: { p1: room.p1Score, p2: room.p2Score } 
+        });
 
         activeRooms = activeRooms.filter(r => r.roomId !== room.roomId);
-        return res.json(finalResult);
+        return res.json({ success: true });
     }
 
-    res.json({ success: true, waitingForOpponent: true });
+    io.to(room.roomId).emit('player-rolled', { username });
+    res.json({ success: true, waiting: true });
 });
 
-// ADMIN PANEL APILAR
+// Admin APIlar eski holatda qoladi...
 app.get('/api/users-list', async (req, res) => {
-    const users = await User.find({});
-    const bots = await Bot.find({});
-    let bank = await Bank.findOne();
-    const history = await History.find().sort({ time: -1 }).limit(10);
-    res.json({ success: true, users, bots, bank, history });
-});
-
-app.post('/api/admin/change-balance', async (req, res) => {
-    const { name, action, amount } = req.body;
-    let isBot = name.startsWith('Muxa');
-    let account = isBot ? await Bot.findOne({ name: name }) : await User.findOne({ username: name });
-    
-    if (!account) return res.status(404).json({ success: false });
-
-    if (action === 'add') account.balance += amount;
-    else if (action === 'remove') account.balance -= amount;
-
-    await account.save();
-    res.json({ success: true });
-});
-
-app.post('/api/admin/clear-tax', async (req, res) => {
-    let bank = await Bank.findOne();
-    if (bank && bank.accumulatedTax > 0) {
-        bank.totalBalance += bank.accumulatedTax; // Yig'ilgan soliq 100 mlnlik bank kassa hisobiga qo'shiladi
-        bank.accumulatedTax = 0;
-        await bank.save();
-        return res.json({ success: true, message: "Soliq muvaffaqiyatli Bank fondiga o'tkazildi!" });
-    }
-    res.json({ success: false, message: "O'tkazish uchun soliq yig'ilmagan!" });
+    res.json({ success: true, users: await User.find({}), bots: await Bot.find({}), bank: await Bank.findOne() || {}, history: await History.find().sort({ time: -1 }).limit(10) });
 });
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/admin-panel', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 
-app.listen(process.env.PORT || 3000, () => console.log('Tizim muvaffaqiyatli sozlanti!'));
+server.listen(process.env.PORT || 3000, () => console.log('Server va Sockets yuklandi!'));
