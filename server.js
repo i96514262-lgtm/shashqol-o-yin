@@ -31,12 +31,10 @@ const botSchema = new mongoose.Schema({
 const Bot = mongoose.model('Bot', botSchema);
 
 // 3. SAHIFALARNI YUKLASH (ROUTES)
-// O'yinning asosiy oynasi
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Admin panel oynasi (Xatolikni oldini olish uchun)
 app.get('/admin-panel', (req, res) => {
     res.sendFile(path.join(__dirname, 'admin.html'));
 });
@@ -52,7 +50,7 @@ app.get('/api/users-list', async (req, res) => {
     }
 });
 
-// 4. LOGIN / REGISTER API
+// 4. LOGIN API
 app.post('/api/login', async (req, res) => {
     try {
         const { username } = req.body;
