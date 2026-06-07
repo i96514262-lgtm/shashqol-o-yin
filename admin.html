@@ -2,40 +2,50 @@
 <html lang="uz">
 <head>
     <meta charset="UTF-8">
-    <title>Admin Panel</title>
+    <title>Admin Dashboard</title>
     <style>
-        body { background: #0f172a; color: white; padding: 20px; }
-        .tax-box { background: #0ea5e9; padding: 20px; border-radius: 12px; margin-bottom: 20px; text-align: center; }
-        table { width: 100%; border-collapse: collapse; background: #1e293b; border-radius: 10px; overflow: hidden; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
-        button { padding: 10px 20px; cursor: pointer; border-radius: 8px; border: none; }
-        .transfer-btn { background: #f59e0b; color: #000; font-weight: bold; width: 100%; margin-top: 10px; }
+        body { background: #0f172a; color: white; font-family: sans-serif; padding: 20px; }
+        .card { background: #1e293b; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; border-bottom: 1px solid #334155; text-align: left; }
+        .live-tag { color: #10b981; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div class="tax-box">
-        <h3>To'plangan Soliq: <span id="tax-amount">0</span> UZS</h3>
-        <button class="transfer-btn" onclick="transferTax()">💰 SOLIQNI BANKKA O'TKAZISH</button>
+
+    <div class="card">
+        <h2>To'plangan Kompaniya Solig'i: <span id="tax" style="color:#eab308;">0</span> UZS</h2>
     </div>
-    
-    <h3>Balanslar</h3>
-    <table id="table"></table>
+
+    <div class="card">
+        <h3>🤖 Botlar va Odamlar Balansi (<span class="live-tag">Jonli 24/7</span>)</h3>
+        <table id="balance-table"></table>
+    </div>
+
+    <div class="card">
+        <h3>📜 Jonli o'yinlar tarixi:</h3>
+        <ul id="history-log" style="list-style: none; padding: 0;"></ul>
+    </div>
 
     <script>
-        async function load() {
+        async function updateDashboard() {
             const res = await fetch('/api/users-list');
             const data = await res.json();
-            document.getElementById('tax-amount').innerText = data.bank.accumulatedTax.toLocaleString();
-            let html = '<tr><th>Ism</th><th>Balans</th></tr>';
-            data.bots.forEach(b => html += `<tr><td>${b.name}</td><td>${b.balance}</td></tr>`);
-            data.users.forEach(u => html += `<tr><td>${u.username}</td><td>${u.balance}</td></tr>`);
-            document.getElementById('table').innerHTML = html;
+
+            document.getElementById('tax').innerText = data.bank.accumulatedTax.toLocaleString();
+
+            let tbl = '<tr><th>Ism/Bot</th><th>Balans</th></tr>';
+            data.bots.forEach(b => tbl += `<tr><td>🤖 ${b.name}</td><td>${b.balance.toLocaleString()} UZS</td></tr>`);
+            data.users.forEach(u => tbl += `<tr><td>👤 ${u.username}</td><td>${u.balance.toLocaleString()} UZS</td></tr>`);
+            document.getElementById('balance-table').innerHTML = tbl;
+
+            let hist = '';
+            data.history.forEach(h => hist += `<li>🕒 ${new Date(h.time).toLocaleTimeString()} -> <b>${h.match}</b> | Garov: ${h.amount.toLocaleString()} | G'olib: <span style="color:#10b981">${h.winner}</span></li>`);
+            document.getElementById('history-log').innerHTML = hist;
         }
-        async function transferTax() {
-            await fetch('/api/admin/transfer-tax', {method: 'POST'});
-            load();
-        }
-        load();
+
+        setInterval(updateDashboard, 2000);
+        updateDashboard();
     </script>
 </body>
 </html>
