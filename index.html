@@ -7,18 +7,13 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         :root { --neon-green: #10b981; --neon-red: #f43f5e; --dark-blue: #0f172a; --card-bg: #1e293b; }
-        body { background: var(--dark-blue); color: white; font-family: 'Poppins', sans-serif; padding: 15px; margin: 0; text-align: center; }
-        
-        .header-card { background: linear-gradient(145deg, #1e293b, #0f172a); padding: 25px; border-radius: 24px; border: 1px solid #334155; box-shadow: 0 15px 30px rgba(0,0,0,0.5); margin-bottom: 20px; }
+        body { background: var(--dark-blue); color: white; font-family: sans-serif; padding: 15px; margin: 0; text-align: center; }
+        .header-card { background: linear-gradient(145deg, #1e293b, #0f172a); padding: 25px; border-radius: 24px; border: 1px solid #334155; margin-bottom: 20px; }
         .balance-val { font-size: 32px; font-weight: 800; color: var(--neon-green); text-shadow: 0 0 10px rgba(16, 185, 129, 0.3); }
-        
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; }
-        .btn { height: 80px; font-size: 18px; font-weight: bold; border: 1px solid #334155; background: var(--card-bg); color: white; border-radius: 16px; cursor: pointer; transition: all 0.2s ease; }
+        .btn { height: 75px; font-size: 18px; font-weight: bold; border: 1px solid #334155; background: var(--card-bg); color: white; border-radius: 16px; cursor: pointer; transition: all 0.2s ease; }
         .btn.active { background: var(--neon-green); border-color: white; color: black; box-shadow: 0 0 15px var(--neon-green); }
-        .btn.special { border: 2px dashed #eab308; }
-        
         .main-action-btn { width: 100%; height: 75px; background: linear-gradient(90deg, var(--neon-red), #e11d48); border: none; border-radius: 18px; color: white; font-size: 22px; font-weight: bold; cursor: pointer; box-shadow: 0 5px 20px rgba(244, 63, 94, 0.4); }
-        
         .timer-box { font-size: 18px; color: #eab308; margin-top: 15px; font-weight: bold; display: none; }
     </style>
 </head>
@@ -27,7 +22,7 @@
     <div class="header-card">
         <p style="margin: 0; opacity: 0.7;">O'yinchi: <b style="color: #fff;">Iz</b></p>
         <div class="balance-val" id="user-balance">5,000,000 UZS</div>
-        <p style="font-size: 12px; color: #94a3b8; margin-top: 5px;">⚡️ 2% Kompaniya Solig'i mavjud</p>
+        <p style="font-size: 12px; color: #94a3b8; margin-top: 5px;">⚡️ 2% Kompaniya Solig'i faol</p>
     </div>
 
     <h3 style="text-align: left; margin-left: 5px;">Xonani Tanlang:</h3>
@@ -37,11 +32,10 @@
         <button class="btn" onclick="selectBet(300000, this)">300,000</button>
         <button class="btn active" onclick="selectBet(700000, this)">700,000</button>
         <button class="btn" onclick="selectBet(1000000, this)">1,000,000</button>
-        <button class="btn special" onclick="selectBet(1200000, this)">💎 1,200,000 <br><small style="font-size:10px;color:#eab308;">Faqat Odamlar</small></button>
+        <button class="btn" onclick="selectBet(1200000, this)">1,200,000</button>
     </div>
 
     <button class="main-action-btn" id="action-btn" onclick="startMatchmake()">GAROV TIKISH</button>
-    
     <div class="timer-box" id="timer-box">⏳ Tosh tashlash vaqti: <span id="countdown">20</span>s</div>
 
     <script>
@@ -66,13 +60,10 @@
             
             if(data.success) {
                 currentRoomId = data.room.roomId;
-                Swal.fire('Xona', data.message, 'info');
-                
-                if(data.room.status === 'playing' || selectedAmount === 700000 || selectedAmount === 1000000) {
-                    enableDiceRoll();
-                }
+                Swal.fire({ title: 'Xona topildi', text: 'Tosh tashlashingiz mumkin.', icon: 'success', timer: 1500, showConfirmButton: false });
+                enableDiceRoll();
             } else {
-                alert(data.message);
+                Swal.fire('Xato', data.message, 'error');
                 document.getElementById('action-btn').innerText = "GAROV TIKISH";
             }
         }
@@ -83,12 +74,14 @@
             document.getElementById('timer-box').style.display = "block";
             
             let timeLeft = 20;
+            document.getElementById('countdown').innerText = timeLeft;
+            clearInterval(timerInterval);
             timerInterval = setInterval(() => {
                 timeLeft--;
                 document.getElementById('countdown').innerText = timeLeft;
                 if(timeLeft <= 0) {
                     clearInterval(timerInterval);
-                    Swal.fire('Vaqt tugadi!', 'Siz o\'z vaqtida javob bermadingiz, raqib avtomatik o\'zgartiriladi.', 'error');
+                    Swal.fire('Vaqt tugadi!', 'O\'yin yangilandi.', 'error');
                     resetGame();
                 }
             }, 1000);
@@ -107,20 +100,17 @@
 
             if(data.success) {
                 if(data.waitingForOpponent) {
-                    Swal.fire('Kutilmoqda', data.message, 'question');
+                    Swal.fire('Kutilmoqda', 'Raqib yurishi kutilmoqda...', 'info');
                 } else {
                     Swal.fire({
                         title: data.result,
-                        html: `Sizning ochkongiz: <b>${data.scores.p1}</b><br>Raqib ochkosi: <b>${data.scores.p2}</b>`,
-                        icon: 'success'
+                        html: `Siz: <b>${data.scores.p1}</b> | Raqib: <b>${data.scores.p2}</b>`,
+                        icon: data.result.includes("Iz") ? 'success' : 'warning'
                     });
-                    if(data.myBalance) {
-                        document.getElementById('user-balance').innerText = data.myBalance.toLocaleString() + " UZS";
-                    }
+                    if(data.myBalance) document.getElementById('user-balance').innerText = data.myBalance.toLocaleString() + " UZS";
                     resetGame();
                 }
             } else {
-                alert(data.message);
                 resetGame();
             }
         }
